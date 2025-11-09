@@ -1,36 +1,242 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PrepUp - AI-Powered Interview Preparation Platform
 
-## Getting Started
+PrepUp is a comprehensive interview preparation platform that uses AI to help job seekers ace their interviews. Get personalized resume feedback, practice with AI-powered mock interviews, and prepare for your dream job with confidence.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 1. Landing Page
+- Hero section with value proposition
+- Feature overview (Resume, Interview Questions, Mock Interview)
+- CTA buttons (Sign Up, Try Demo)
+- Pricing section (Free, Pro, Enterprise)
+- FAQ section with common questions
+- Stats showcase
+- Newsletter signup
+
+### 2. Authentication
+- Sign Up page with Clerk integration
+- Login page
+- Password reset functionality
+- Email verification
+- Protected routes for dashboard
+
+### 3. User Dashboard
+- Overview dashboard with quick access to features
+- User profile and settings
+- Usage statistics and progress tracking
+- Recent activity feed
+- Upcoming sessions calendar
+- Weekly progress metrics
+
+### 4. Resume Management Module
+- Resume upload/editor page
+- AI-powered feedback and suggestions
+- ATS optimization scoring
+- Resume versioning and history
+- Multiple professional templates
+- Export to PDF functionality
+- Version comparison
+
+### 5. Interview Preparation Module
+- AI-powered interview question generator (resume-based)
+- Question library with categories:
+  - Behavioral
+  - Technical
+  - System Design
+  - Leadership
+  - Problem Solving
+  - Company Specific
+- Answer tips and frameworks (STAR method)
+- Bookmarking and note-taking features
+- Practice tracking
+
+### 6. Mock Interview Module (Voice AI)
+- Voice AI interviewer integration
+- Real-time conversation page
+- Multiple interview types:
+  - Technical Interview
+  - Behavioral Interview
+  - System Design
+  - Leadership Interview
+- Recording and playback functionality
+- AI evaluation and feedback on responses
+- Session history and progress tracking
+- Performance insights dashboard
+
+### 7. User Settings & Account Management
+- Profile settings (name, email, language preferences, timezone)
+- Current role and target role configuration
+- Subscription management and billing
+- Payment method management
+- Billing history
+- Privacy and data settings
+- Notification preferences
+- Account deletion and data export
+
+### 8. Additional Pages
+- **About Us**: Company story, values, team, impact stats
+- **Terms of Service**: Complete legal terms
+- **Privacy Policy**: Comprehensive privacy information
+- **Contact Us**: Contact form with office information
+- **Blog**: Articles on interview tips, career advice, industry insights
+- **Help Center**: FAQ, knowledge base, popular articles
+- **Error Pages**: Custom 404 and error pages
+- **Demo Page**: Try features without signing up
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 15.4.6 with App Router
+- **UI Library**: React 19.1.0
+- **Styling**: Tailwind CSS 4 with custom configuration
+- **Components**: shadcn/ui (New York style)
+- **Authentication**: Clerk
+- **Deployment**: Cloudflare (with OpenNext)
+- **Language**: TypeScript
+- **Icons**: Lucide React
+
+## 📦 Project Structure
+
+```
+prepup/
+├── app/
+│   ├── about/page.tsx                  # About page
+│   ├── auth/
+│   │   ├── sign-in/page.tsx           # Sign in page
+│   │   └── sign-up/page.tsx           # Sign up page
+│   ├── blog/page.tsx                   # Blog listing
+│   ├── contact/page.tsx                # Contact form
+│   ├── dashboard/
+│   │   ├── page.tsx                   # Dashboard home
+│   │   ├── resume/
+│   │   │   ├── page.tsx               # Resume management
+│   │   │   └── upload/page.tsx        # Resume upload
+│   │   ├── questions/page.tsx         # Interview questions
+│   │   ├── mock-interview/page.tsx    # Mock interviews
+│   │   └── settings/page.tsx          # User settings
+│   ├── demo/page.tsx                   # Demo features
+│   ├── help/page.tsx                   # Help center
+│   ├── privacy/page.tsx                # Privacy policy
+│   ├── terms/page.tsx                  # Terms of service
+│   ├── error.tsx                       # Error page
+│   ├── not-found.tsx                   # 404 page
+│   ├── layout.tsx                      # Root layout
+│   ├── page.tsx                        # Landing page
+│   └── globals.css                     # Global styles
+├── components/
+│   ├── ui/                             # shadcn/ui components
+│   ├── navigation.tsx                  # Main navigation
+│   └── footer.tsx                      # Footer component
+├── lib/
+│   └── utils.ts                        # Utility functions
+├── middleware.ts                       # Clerk middleware
+└── package.json                        # Dependencies
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚦 Getting Started
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 20+ and npm
+- Clerk account for authentication
 
-## Learn More
+### Installation
 
-To learn more about Next.js, take a look at the following resources:
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd prepup
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Set up environment variables:
+Create a `.dev.vars` file in the root directory and add your Clerk keys:
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
+CLERK_SECRET_KEY=your_secret_key
+```
 
-## Deploy on Vercel
+4. Run the development server:
+```bash
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 Available Scripts
+
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run deploy` - Build and deploy to Cloudflare
+- `npm run preview` - Preview Cloudflare build
+- `npm run cf-typegen` - Generate Cloudflare types
+
+## 🎨 UI Components
+
+The project uses shadcn/ui components with the following installed:
+- Button, Card, Input, Textarea
+- Accordion, Tabs, Badge, Avatar
+- Select, Dropdown Menu, Dialog
+- Separator, Label, Checkbox
+- Radio Group, Slider, Progress, Switch
+
+## 🔐 Authentication
+
+Authentication is handled by Clerk with the following routes protected:
+- `/dashboard/*` - All dashboard routes require authentication
+
+## 🌐 Deployment
+
+The project is configured for deployment on Cloudflare using OpenNext:
+
+```bash
+npm run deploy
+```
+
+## 📄 Environment Variables
+
+Required environment variables:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
+- `CLERK_SECRET_KEY` - Clerk secret key
+
+## 🎯 Key Features Implementation
+
+### Mock Data
+All pages currently use mock data for demonstration purposes. In production, these would be replaced with actual API calls to your backend services.
+
+### Protected Routes
+The middleware protects all `/dashboard/*` routes, requiring authentication before access.
+
+### Responsive Design
+All pages are fully responsive and work on mobile, tablet, and desktop devices.
+
+### Dark Mode Support
+The application supports dark mode through Tailwind's dark mode configuration.
+
+## 🤝 Contributing
+
+This is a demo project. For production use, consider:
+- Implementing actual API endpoints
+- Adding real AI integration
+- Setting up a database
+- Implementing file upload functionality
+- Adding payment processing
+- Setting up email services
+
+## 📧 Support
+
+For support, email support@prepup.com or visit the Help Center.
+
+## 📜 License
+
+All rights reserved © 2025 PrepUp
+
+---
+
+Built with ❤️ using Next.js and Clerk
