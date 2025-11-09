@@ -2,6 +2,10 @@
 
 PrepUp is a comprehensive interview preparation platform that uses AI to help job seekers ace their interviews. Get personalized resume feedback, practice with AI-powered mock interviews, and prepare for your dream job with confidence.
 
+## 📚 **[📖 전체 문서 보기 (docs/)](./docs/)**
+
+> 모든 상세 가이드, API 문서, 배포 가이드는 `docs/` 폴더에서 확인하세요!
+
 ## 🚀 Features
 
 ### 1. Landing Page
@@ -133,39 +137,24 @@ prepup/
 
 ```
 
-## 🚦 Getting Started
+## 🚀 빠른 시작
 
-### Prerequisites
-
-- Node.js 20+ and npm
-- Clerk account for authentication
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd prepup
-```
-
-2. Install dependencies:
-```bash
+# 1. 의존성 설치
 npm install
-```
 
-3. Set up environment variables:
-Create a `.dev.vars` file in the root directory and add your Clerk keys:
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
-CLERK_SECRET_KEY=your_secret_key
-```
+# 2. 환경 변수 설정 (.dev.vars 파일 생성)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_key
+CLERK_SECRET_KEY=your_secret
 
-4. Run the development server:
-```bash
+# 3. 로컬 데이터베이스 설정
+npx wrangler d1 execute prepup-db --local --file=./schema.sql
+
+# 4. 개발 서버 실행
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+**상세 가이드**: [개발 시작하기](./docs/development/getting-started.md)
 
 ## 📝 Available Scripts
 
@@ -199,11 +188,34 @@ The project is configured for deployment on Cloudflare using OpenNext:
 npm run deploy
 ```
 
-## 📄 Environment Variables
+## 📚 주요 문서
 
-Required environment variables:
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
-- `CLERK_SECRET_KEY` - Clerk secret key
+### 시작하기
+- [개발 환경 설정](./docs/development/getting-started.md) - 로컬 개발 환경 구축
+- [한글 가이드](./docs/guides/korean-guide.md) - 완전한 한국어 가이드
+
+### 데이터베이스
+- [데이터베이스 빠른 시작](./docs/database/quick-start.md) - 5분 안에 D1 & R2 설정
+- [데이터베이스 스키마](./docs/database/schema.md) - 전체 스키마 문서
+- [쿼리 예제](./docs/database/queries.md) - 자주 사용하는 쿼리
+- [마이그레이션 가이드](./docs/database/migration.md) - 데이터베이스 마이그레이션
+
+### API & 인증
+- [Clerk 인증 설정](./docs/api/authentication.md) - Clerk 통합 가이드
+- [API 엔드포인트](./docs/api/endpoints.md) - REST API 문서
+
+### 배포
+- [Cloudflare 배포](./docs/deployment/cloudflare.md) - Cloudflare Workers 배포 가이드
+- [환경 변수 관리](./docs/deployment/environment.md) - 환경 변수 설정
+
+## 📄 환경 변수
+
+필수 환경 변수:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk 공개 키
+- `CLERK_SECRET_KEY` - Clerk 비밀 키
+- `CLERK_WEBHOOK_SECRET` - Clerk Webhook 시크릿
+
+**상세 정보**: [환경 변수 가이드](./docs/deployment/environment.md)
 
 ## 🎯 Key Features Implementation
 
