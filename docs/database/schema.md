@@ -3,6 +3,7 @@
 PrepUp 데이터베이스의 전체 스키마와 각 테이블의 상세 설명입니다.
 
 ## 📋 목차
+
 - [개요](#개요)
 - [ERD (관계도)](#erd-관계도)
 - [테이블 상세](#테이블-상세)
@@ -15,12 +16,14 @@ PrepUp 데이터베이스의 전체 스키마와 각 테이블의 상세 설명�
 PrepUp은 Cloudflare D1 (SQLite)을 사용하며, Clerk 인증과 통합되어 있습니다.
 
 ### 주요 특징
+
 - ✅ Foreign Key 활성화 (`PRAGMA foreign_keys = ON`)
 - ✅ 자동 타임스탬프 관리 (트리거)
 - ✅ CHECK 제약 조건으로 데이터 무결성 보장
 - ✅ 효율적인 인덱싱 전략
 
 ### 데이터베이스 정보
+
 - **엔진**: SQLite (Cloudflare D1)
 - **인증**: Clerk (clerk_user_id 기반)
 - **타임존**: UTC
@@ -64,41 +67,33 @@ PrepUp은 Cloudflare D1 (SQLite)을 사용하며, Clerk 인증과 통합되어 �
 
 ### 1. `users` - 사용자 정보
 
-Clerk와 동기화되는 사용자 정보 테이블입니다.
+Clerk와 동기화되는 사용자 정보 테이블입니다. 최소한의 정보만 저장합니다.
 
 ```sql
 CREATE TABLE users (
   clerk_user_id         TEXT PRIMARY KEY,
-  email                 TEXT UNIQUE NOT NULL,
-  first_name            TEXT,
-  last_name             TEXT,
-  profile_image_url     TEXT,
   language_preference   TEXT NOT NULL DEFAULT 'en',
-  subscription_tier     TEXT CHECK (subscription_tier IN ('free','premium','pro')) DEFAULT 'free',
-  subscription_end_date DATE,
   created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 #### 컬럼 설명
-| 컬럼 | 타입 | 설명 | 기본값 |
-|------|------|------|--------|
-| clerk_user_id | TEXT | Clerk 사용자 ID (PK) | - |
-| email | TEXT | 이메일 주소 (Unique) | - |
-| first_name | TEXT | 이름 | NULL |
-| last_name | TEXT | 성 | NULL |
-| profile_image_url | TEXT | 프로필 이미지 URL | NULL |
-| language_preference | TEXT | 언어 설정 (en, ko, etc.) | 'en' |
-| subscription_tier | TEXT | 구독 등급 | 'free' |
-| subscription_end_date | DATE | 구독 만료일 | NULL |
-| created_at | DATETIME | 생성일시 | CURRENT_TIMESTAMP |
-| updated_at | DATETIME | 수정일시 (자동) | CURRENT_TIMESTAMP |
 
-#### 인덱스
-- `idx_users_email` - 이메일 검색 최적화
+| 컬럼                | 타입     | 설명                     | 기본값            |
+| ------------------- | -------- | ------------------------ | ----------------- |
+| clerk_user_id       | TEXT     | Clerk 사용자 ID (PK)     | -                 |
+| language_preference | TEXT     | 언어 설정 (en, ko, etc.) | 'en'              |
+| created_at          | DATETIME | 생성일시                 | CURRENT_TIMESTAMP |
+| updated_at          | DATETIME | 수정일시 (자동)          | CURRENT_TIMESTAMP |
+
+#### 참고사항
+
+- 사용자의 이메일, 이름, 프로필 이미지 등은 Clerk에서 직접 조회합니다.
+- 구독 정보는 `subscriptions` 테이블에서 관리합니다.
 
 #### 관계
+
 - `resumes` (1:N)
 - `interview_questions` (1:N)
 - `mock_interview_sessions` (1:N)
@@ -130,21 +125,23 @@ CREATE TABLE resumes (
 ```
 
 #### 컬럼 설명
-| 컬럼 | 타입 | 설명 | 기본값 |
-|------|------|------|--------|
-| resume_id | TEXT | 이력서 ID (PK) | - |
-| clerk_user_id | TEXT | 사용자 ID (FK) | - |
-| title | TEXT | 이력서 제목 | - |
-| content | TEXT | 이력서 내용 (원문) | NULL |
-| version | INTEGER | 버전 번호 | 1 |
-| is_active | INTEGER | 활성화 여부 (0/1) | 1 |
-| file_url | TEXT | R2 파일 URL | NULL |
-| ai_feedback | TEXT | AI 피드백 (JSON) | NULL |
-| score | INTEGER | ATS 점수 (0-100) | NULL |
-| created_at | DATETIME | 생성일시 | CURRENT_TIMESTAMP |
-| updated_at | DATETIME | 수정일시 (자동) | CURRENT_TIMESTAMP |
+
+| 컬럼          | 타입     | 설명               | 기본값            |
+| ------------- | -------- | ------------------ | ----------------- |
+| resume_id     | TEXT     | 이력서 ID (PK)     | -                 |
+| clerk_user_id | TEXT     | 사용자 ID (FK)     | -                 |
+| title         | TEXT     | 이력서 제목        | -                 |
+| content       | TEXT     | 이력서 내용 (원문) | NULL              |
+| version       | INTEGER  | 버전 번호          | 1                 |
+| is_active     | INTEGER  | 활성화 여부 (0/1)  | 1                 |
+| file_url      | TEXT     | R2 파일 URL        | NULL              |
+| ai_feedback   | TEXT     | AI 피드백 (JSON)   | NULL              |
+| score         | INTEGER  | ATS 점수 (0-100)   | NULL              |
+| created_at    | DATETIME | 생성일시           | CURRENT_TIMESTAMP |
+| updated_at    | DATETIME | 수정일시 (자동)    | CURRENT_TIMESTAMP |
 
 #### AI Feedback JSON 구조
+
 ```typescript
 {
   "summary": "전반적인 평가",
@@ -156,6 +153,7 @@ CREATE TABLE resumes (
 ```
 
 #### 인덱스
+
 - `idx_resumes_user` - 사용자별 이력서 조회
 - `idx_resumes_active` - 활성 이력서 필터링
 
@@ -183,16 +181,19 @@ CREATE TABLE interview_questions (
 ```
 
 #### 카테고리
+
 - **behavioral**: 행동 면접 (STAR 방식)
 - **technical**: 기술 면접 (코딩, 시스템 설계)
 - **situational**: 상황 면접 (문제 해결)
 
 #### 난이도
+
 - **easy**: 쉬움 (기본 개념)
 - **medium**: 보통 (실무 경험)
 - **hard**: 어려움 (깊은 이해 필요)
 
 #### 인덱스
+
 - `idx_q_user` - 사용자별 질문 조회
 - `idx_q_resume` - 이력서별 질문 조회
 - `idx_q_cat_diff` - 카테고리/난이도 필터링
@@ -222,11 +223,13 @@ CREATE TABLE mock_interview_sessions (
 ```
 
 #### 상태 (status)
+
 - **in_progress**: 진행 중
 - **completed**: 완료
 - **paused**: 일시정지
 
 #### AI Evaluation JSON 구조
+
 ```typescript
 {
   "communication_score": 85,
@@ -240,6 +243,7 @@ CREATE TABLE mock_interview_sessions (
 ```
 
 #### 인덱스
+
 - `idx_sessions_user` - 사용자별 세션 조회
 - `idx_sessions_status` - 상태별 필터링
 - `idx_sessions_start` - 날짜별 정렬
@@ -267,6 +271,7 @@ CREATE TABLE interview_answers (
 ```
 
 #### 인덱스
+
 - `idx_answers_session` - 세션별 답변 조회
 - `idx_answers_question` - 질문별 답변 조회
 
@@ -294,18 +299,21 @@ CREATE TABLE subscriptions (
 ```
 
 #### 구독 등급
-| 등급 | 월 가격 | 특징 |
-|------|---------|------|
-| free | $0 | 1 이력서, 20 질문, 1 모의 인터뷰 |
-| premium | $29 | 무제한 이력서/질문, 20 모의 인터뷰 |
-| pro | Custom | Enterprise 기능 |
+
+| 등급    | 월 가격 | 특징                               |
+| ------- | ------- | ---------------------------------- |
+| free    | $0      | 1 이력서, 20 질문, 1 모의 인터뷰   |
+| premium | $29     | 무제한 이력서/질문, 20 모의 인터뷰 |
+| pro     | Custom  | Enterprise 기능                    |
 
 #### 결제 제공자
+
 - **toss_payments**: 토스페이먼츠 (한국)
 - **kakao_pay**: 카카오페이 (한국)
 - **paddle**: Paddle (글로벌)
 
 #### 인덱스
+
 - `idx_subscriptions_user` - 사용자별 구독 조회
 - `idx_subscriptions_status` - 상태별 필터링
 
@@ -330,6 +338,7 @@ CREATE TABLE user_notes (
 ```
 
 #### 인덱스
+
 - `idx_notes_user` - 사용자별 노트 조회
 - `idx_notes_question` - 질문별 노트 조회
 
@@ -353,6 +362,7 @@ CREATE TABLE usage_stats (
 ```
 
 #### 인덱스
+
 - `idx_usage_user_unique` (UNIQUE) - 사용자당 하나의 통계
 
 ---
@@ -361,24 +371,23 @@ CREATE TABLE usage_stats (
 
 ### 인덱스 목록
 
-| 인덱스 이름 | 테이블 | 컬럼 | 용도 |
-|-------------|--------|------|------|
-| idx_users_email | users | email | 이메일 검색 |
-| idx_resumes_user | resumes | clerk_user_id | 사용자 이력서 조회 |
-| idx_resumes_active | resumes | is_active | 활성 이력서 필터 |
-| idx_q_user | interview_questions | clerk_user_id | 사용자 질문 조회 |
-| idx_q_resume | interview_questions | resume_id | 이력서별 질문 |
-| idx_q_cat_diff | interview_questions | category, difficulty | 카테고리/난이도 필터 |
-| idx_sessions_user | mock_interview_sessions | clerk_user_id | 사용자 세션 조회 |
-| idx_sessions_status | mock_interview_sessions | status | 상태별 필터 |
-| idx_sessions_start | mock_interview_sessions | start_time | 날짜 정렬 |
-| idx_answers_session | interview_answers | session_id | 세션 답변 조회 |
-| idx_answers_question | interview_answers | question_id | 질문 답변 조회 |
-| idx_subscriptions_user | subscriptions | clerk_user_id | 구독 조회 |
-| idx_subscriptions_status | subscriptions | status | 상태 필터 |
-| idx_notes_user | user_notes | clerk_user_id | 사용자 노트 조회 |
-| idx_notes_question | user_notes | question_id | 질문 노트 조회 |
-| idx_usage_user_unique | usage_stats | clerk_user_id | 통계 조회 (UNIQUE) |
+| 인덱스 이름              | 테이블                  | 컬럼                 | 용도                 |
+| ------------------------ | ----------------------- | -------------------- | -------------------- |
+| idx_resumes_user         | resumes                 | clerk_user_id        | 사용자 이력서 조회   |
+| idx_resumes_active       | resumes                 | is_active            | 활성 이력서 필터     |
+| idx_q_user               | interview_questions     | clerk_user_id        | 사용자 질문 조회     |
+| idx_q_resume             | interview_questions     | resume_id            | 이력서별 질문        |
+| idx_q_cat_diff           | interview_questions     | category, difficulty | 카테고리/난이도 필터 |
+| idx_sessions_user        | mock_interview_sessions | clerk_user_id        | 사용자 세션 조회     |
+| idx_sessions_status      | mock_interview_sessions | status               | 상태별 필터          |
+| idx_sessions_start       | mock_interview_sessions | start_time           | 날짜 정렬            |
+| idx_answers_session      | interview_answers       | session_id           | 세션 답변 조회       |
+| idx_answers_question     | interview_answers       | question_id          | 질문 답변 조회       |
+| idx_subscriptions_user   | subscriptions           | clerk_user_id        | 구독 조회            |
+| idx_subscriptions_status | subscriptions           | status               | 상태 필터            |
+| idx_notes_user           | user_notes              | clerk_user_id        | 사용자 노트 조회     |
+| idx_notes_question       | user_notes              | question_id          | 질문 노트 조회       |
+| idx_usage_user_unique    | usage_stats             | clerk_user_id        | 통계 조회 (UNIQUE)   |
 
 ### 인덱스 사용 가이드
 
@@ -390,9 +399,11 @@ SELECT * FROM resumes WHERE clerk_user_id = ? AND is_active = 1;
 SELECT * FROM resumes WHERE title LIKE '%engineer%';
 
 -- ✅ 좋은 예: 복합 인덱스 활용
-SELECT * FROM interview_questions 
+SELECT * FROM interview_questions
 WHERE category = 'technical' AND difficulty = 'hard';
 ```
+
+**참고**: `users` 테이블은 최소한의 컬럼만 포함하므로 별도의 인덱스가 필요하지 않습니다.
 
 ---
 
@@ -407,7 +418,7 @@ WHERE category = 'technical' AND difficulty = 'hard';
 CREATE TRIGGER trg_users_updated
 AFTER UPDATE ON users
 FOR EACH ROW BEGIN
-  UPDATE users SET updated_at = CURRENT_TIMESTAMP 
+  UPDATE users SET updated_at = CURRENT_TIMESTAMP
   WHERE clerk_user_id = NEW.clerk_user_id;
 END;
 
@@ -415,7 +426,7 @@ END;
 CREATE TRIGGER trg_resumes_updated
 AFTER UPDATE ON resumes
 FOR EACH ROW BEGIN
-  UPDATE resumes SET updated_at = CURRENT_TIMESTAMP 
+  UPDATE resumes SET updated_at = CURRENT_TIMESTAMP
   WHERE resume_id = NEW.resume_id;
 END;
 
@@ -423,7 +434,7 @@ END;
 CREATE TRIGGER trg_subscriptions_updated
 AFTER UPDATE ON subscriptions
 FOR EACH ROW BEGIN
-  UPDATE subscriptions SET updated_at = CURRENT_TIMESTAMP 
+  UPDATE subscriptions SET updated_at = CURRENT_TIMESTAMP
   WHERE subscription_id = NEW.subscription_id;
 END;
 
@@ -431,7 +442,7 @@ END;
 CREATE TRIGGER trg_notes_updated
 AFTER UPDATE ON user_notes
 FOR EACH ROW BEGIN
-  UPDATE user_notes SET updated_at = CURRENT_TIMESTAMP 
+  UPDATE user_notes SET updated_at = CURRENT_TIMESTAMP
   WHERE note_id = NEW.note_id;
 END;
 ```
@@ -443,28 +454,33 @@ END;
 ### CHECK 제약 조건
 
 #### users 테이블
+
 ```sql
-CHECK (subscription_tier IN ('free','premium','pro'))
+-- CHECK 제약 조건 없음 (최소한의 컬럼만 포함)
 ```
 
 #### resumes 테이블
+
 ```sql
 CHECK (score BETWEEN 0 AND 100)
 ```
 
 #### interview_questions 테이블
+
 ```sql
 CHECK (category IN ('behavioral','technical','situational'))
 CHECK (difficulty IN ('easy','medium','hard'))
 ```
 
 #### mock_interview_sessions 테이블
+
 ```sql
 CHECK (overall_score BETWEEN 0 AND 100)
 CHECK (status IN ('in_progress','completed','paused'))
 ```
 
 #### subscriptions 테이블
+
 ```sql
 CHECK (tier IN ('free','premium','pro'))
 CHECK (status IN ('active','cancelled','expired'))
@@ -495,4 +511,3 @@ FOREIGN KEY (resume_id) REFERENCES resumes(resume_id) ON DELETE SET NULL
 ---
 
 **마지막 업데이트**: 2025년 11월 9일
-

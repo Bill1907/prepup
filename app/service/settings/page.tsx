@@ -1,5 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,12 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { User, Bell, CreditCard, Shield, Download, Trash2, Globe } from "lucide-react";
 
 export default async function SettingsPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/auth/sign-in");
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

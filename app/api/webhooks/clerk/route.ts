@@ -63,27 +63,11 @@ export async function POST(req: Request) {
   try {
     // 사용자 생성 이벤트 처리
     if (eventType === "user.created") {
-      const { id, email_addresses, first_name, last_name, image_url } =
-        evt.data;
-
-      const primaryEmail =
-        email_addresses?.find(
-          (email: any) => email.id === evt.data.primary_email_address_id
-        )?.email_address || email_addresses?.[0]?.email_address;
-
-      if (!primaryEmail) {
-        console.error("No email address found for user:", id);
-        return new Response("Error: No email address found", { status: 400 });
-      }
+      const { id } = evt.data;
 
       await db.insert(users).values({
         clerkUserId: id,
-        email: primaryEmail,
-        firstName: first_name || null,
-        lastName: last_name || null,
-        profileImageUrl: image_url || null,
         languagePreference: "en",
-        subscriptionTier: "free",
       });
 
       console.log("User created in D1:", id);
@@ -92,31 +76,11 @@ export async function POST(req: Request) {
 
     // 사용자 업데이트 이벤트 처리
     if (eventType === "user.updated") {
-      const { id, email_addresses, first_name, last_name, image_url } =
-        evt.data;
+      const { id } = evt.data;
 
-      const primaryEmail =
-        email_addresses?.find(
-          (email: any) => email.id === evt.data.primary_email_address_id
-        )?.email_address || email_addresses?.[0]?.email_address;
-
-      if (!primaryEmail) {
-        console.error("No email address found for user:", id);
-        return new Response("Error: No email address found", { status: 400 });
-      }
-
-      await db
-        .update(users)
-        .set({
-          email: primaryEmail,
-          firstName: first_name || null,
-          lastName: last_name || null,
-          profileImageUrl: image_url || null,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(users.clerkUserId, id));
-
-      console.log("User updated in D1:", id);
+      // updated_at은 트리거에 의해 자동으로 업데이트됩니다
+      // language_preference만 업데이트가 필요한 경우 여기서 처리할 수 있습니다
+      console.log("User updated in Clerk:", id);
       return new Response("User updated successfully", { status: 200 });
     }
 

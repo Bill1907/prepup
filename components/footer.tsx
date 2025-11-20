@@ -19,12 +19,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/resume" className="hover:text-white transition-colors">
+                <Link href="/service/resume" className="hover:text-white transition-colors">
                   Resume Review
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/mock-interview" className="hover:text-white transition-colors">
+                <Link href="/service/mock-interview" className="hover:text-white transition-colors">
                   Mock Interviews
                 </Link>
               </li>

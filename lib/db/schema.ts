@@ -37,26 +37,15 @@ export const users = sqliteTable(
   "users",
   {
     clerkUserId: text("clerk_user_id").primaryKey(),
-    email: text("email").notNull().unique(),
-    firstName: text("first_name"),
-    lastName: text("last_name"),
-    profileImageUrl: text("profile_image_url"),
+    email: text("email"), // 실제 DB에 존재하는 필드 (nullable)
     languagePreference: text("language_preference").notNull().default("en"),
-    subscriptionTier: text("subscription_tier")
-      .$type<(typeof subscriptionTierEnum)[number]>()
-      .notNull()
-      .default("free" as (typeof subscriptionTierEnum)[number]),
-    subscriptionEndDate: text("subscription_end_date"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
-  },
-  (table) => ({
-    emailIdx: index("idx_users_email").on(table.email),
-  })
+  }
 );
 
 // 2) RESUMES
@@ -87,7 +76,36 @@ export const resumes = sqliteTable(
   })
 );
 
-// 3) INTERVIEW QUESTIONS
+// 3) RESUME HISTORY
+export const resumeHistory = sqliteTable(
+  "resume_history",
+  {
+    historyId: text("history_id").primaryKey(),
+    resumeId: text("resume_id")
+      .notNull()
+      .references(() => resumes.resumeId, { onDelete: "cascade" }),
+    clerkUserId: text("clerk_user_id")
+      .notNull()
+      .references(() => users.clerkUserId, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content"),
+    version: integer("version").notNull(),
+    fileUrl: text("file_url"),
+    aiFeedback: text("ai_feedback"), // JSON as TEXT
+    score: integer("score"), // CHECK (score BETWEEN 0 AND 100)
+    changeReason: text("change_reason"), // 변경 사유 (선택사항)
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    resumeIdx: index("idx_history_resume").on(table.resumeId),
+    userIdx: index("idx_history_user").on(table.clerkUserId),
+    createdAtIdx: index("idx_history_created").on(table.createdAt),
+  })
+);
+
+// 4) INTERVIEW QUESTIONS
 export const interviewQuestions = sqliteTable(
   "interview_questions",
   {
@@ -117,7 +135,7 @@ export const interviewQuestions = sqliteTable(
   })
 );
 
-// 4) MOCK INTERVIEW SESSIONS
+// 5) MOCK INTERVIEW SESSIONS
 export const mockInterviewSessions = sqliteTable(
   "mock_interview_sessions",
   {
@@ -149,7 +167,7 @@ export const mockInterviewSessions = sqliteTable(
   })
 );
 
-// 5) INTERVIEW ANSWERS
+// 6) INTERVIEW ANSWERS
 export const interviewAnswers = sqliteTable(
   "interview_answers",
   {
@@ -179,7 +197,7 @@ export const interviewAnswers = sqliteTable(
   })
 );
 
-// 6) SUBSCRIPTIONS
+// 7) SUBSCRIPTIONS
 export const subscriptions = sqliteTable(
   "subscriptions",
   {
@@ -215,7 +233,7 @@ export const subscriptions = sqliteTable(
   })
 );
 
-// 7) USER NOTES
+// 8) USER NOTES
 export const userNotes = sqliteTable(
   "user_notes",
   {
@@ -244,7 +262,7 @@ export const userNotes = sqliteTable(
   })
 );
 
-// 8) USAGE STATS
+// 9) USAGE STATS
 export const usageStats = sqliteTable(
   "usage_stats",
   {
@@ -268,6 +286,7 @@ export const usageStats = sqliteTable(
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   resumes: many(resumes),
+  resumeHistory: many(resumeHistory),
   interviewQuestions: many(interviewQuestions),
   mockInterviewSessions: many(mockInterviewSessions),
   subscriptions: many(subscriptions),
@@ -282,6 +301,18 @@ export const resumesRelations = relations(resumes, ({ one, many }) => ({
   }),
   interviewQuestions: many(interviewQuestions),
   mockInterviewSessions: many(mockInterviewSessions),
+  history: many(resumeHistory),
+}));
+
+export const resumeHistoryRelations = relations(resumeHistory, ({ one }) => ({
+  resume: one(resumes, {
+    fields: [resumeHistory.resumeId],
+    references: [resumes.resumeId],
+  }),
+  user: one(users, {
+    fields: [resumeHistory.clerkUserId],
+    references: [users.clerkUserId],
+  }),
 }));
 
 export const interviewQuestionsRelations = relations(

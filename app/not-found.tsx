@@ -40,7 +40,7 @@ export default function NotFound() {
             Need help? Here are some helpful links:
           </p>
           <div className="flex flex-wrap gap-4 justify-center text-sm">
-            <Link href="/dashboard" className="text-blue-600 hover:underline">
+            <Link href="/service/dashboard" className="text-blue-600 hover:underline">
               Dashboard
             </Link>
             <Link href="/contact" className="text-blue-600 hover:underline">

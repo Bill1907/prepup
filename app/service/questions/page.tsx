@@ -1,5 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Search, Bookmark, TrendingUp, Zap, BookOpen, Star } from "lucide-react";
 
 export default async function QuestionsPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/auth/sign-in");
-  }
-
   // Mock data
   const categories = [
     { name: "Behavioral", count: 45, icon: "💼" },
@@ -232,12 +224,12 @@ export default async function QuestionsPage() {
 
                           <div className="flex gap-2">
                             <Button size="sm" asChild>
-                              <Link href={`/dashboard/questions/${question.id}/practice`}>
+                              <Link href={`/service/questions/${question.id}/practice`}>
                                 Practice
                               </Link>
                             </Button>
                             <Button size="sm" variant="outline" asChild>
-                              <Link href={`/dashboard/questions/${question.id}`}>
+                              <Link href={`/service/questions/${question.id}`}>
                                 View Answer Framework
                               </Link>
                             </Button>
@@ -322,13 +314,13 @@ export default async function QuestionsPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/dashboard/questions/generate">
+                  <Link href="/service/questions/generate">
                     <Zap className="mr-2 h-4 w-4" />
                     Generate Resume-Based Questions
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/dashboard/mock-interview">
+                  <Link href="/service/mock-interview">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Start Mock Interview
                   </Link>

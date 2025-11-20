@@ -8,6 +8,7 @@ import type {
 import {
   users,
   resumes,
+  resumeHistory,
   interviewQuestions,
   mockInterviewSessions,
   interviewAnswers,
@@ -19,6 +20,7 @@ import {
 // Select 타입 (조회용)
 export type User = InferSelectModel<typeof users>;
 export type Resume = InferSelectModel<typeof resumes>;
+export type ResumeHistory = InferSelectModel<typeof resumeHistory>;
 export type InterviewQuestion = InferSelectModel<typeof interviewQuestions>;
 export type MockInterviewSession = InferSelectModel<
   typeof mockInterviewSessions
@@ -31,6 +33,7 @@ export type UsageStat = InferSelectModel<typeof usageStats>;
 // Insert 타입 (삽입용)
 export type NewUser = InferInsertModel<typeof users>;
 export type NewResume = InferInsertModel<typeof resumes>;
+export type NewResumeHistory = InferInsertModel<typeof resumeHistory>;
 export type NewInterviewQuestion = InferInsertModel<typeof interviewQuestions>;
 export type NewMockInterviewSession = InferInsertModel<
   typeof mockInterviewSessions

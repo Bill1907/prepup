@@ -5,30 +5,71 @@
 //   import { getDrizzleDB } from "@/lib/db/index";
 
 import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 // Drizzle ORM re-export (편의를 위해)
-export { getDrizzleDB } from "./db/index";
+export { getDrizzleDB, ensureUserExists } from "./db/index";
 export * from "./db/schema";
 
 /**
  * R2 스토리지 인스턴스 가져오기
  * Cloudflare R2 바인딩에서 스토리지 인스턴스를 반환합니다.
+ * 로컬 개발 환경과 Cloudflare Workers 환경 모두 지원합니다.
  *
  * @returns R2Bucket 인스턴스
  * @throws 환경 변수에 FILES 바인딩이 없으면 에러 발생
  */
 export function getR2() {
-  const { env } = getRequestContext();
-  // CloudflareEnv는 cloudflare-env.d.ts에서 전역으로 선언됨
-  const typedEnv = env as CloudflareEnv;
+  let r2Bucket: R2Bucket;
 
-  if (!typedEnv.FILES) {
-    throw new Error(
-      'R2 bucket binding "FILES" is not configured. Please check wrangler.jsonc.'
-    );
+  try {
+    // 먼저 @cloudflare/next-on-pages를 시도 (프로덕션 환경)
+    const { env } = getRequestContext();
+    const typedEnv = env as CloudflareEnv;
+
+    if (!typedEnv.FILES) {
+      throw new Error(
+        'R2 bucket binding "FILES" is not configured. Please check wrangler.jsonc.'
+      );
+    }
+
+    r2Bucket = typedEnv.FILES;
+  } catch (error) {
+    // 로컬 개발 환경 (npm run dev)에서는 @opennextjs/cloudflare 사용
+    // initOpenNextCloudflareForDev()가 next.config.ts에서 호출되어 있음
+    try {
+      const { env } = getCloudflareContext();
+      const typedEnv = env as CloudflareEnv;
+
+      if (!typedEnv.FILES) {
+        throw new Error(
+          'R2 bucket binding "FILES" is not configured. Please check wrangler.jsonc.'
+        );
+      }
+
+      r2Bucket = typedEnv.FILES;
+    } catch (fallbackError) {
+      // 두 방법 모두 실패한 경우
+      if (error instanceof Error && error.message.includes("FILES")) {
+        throw error;
+      }
+      if (
+        fallbackError instanceof Error &&
+        fallbackError.message.includes("FILES")
+      ) {
+        throw fallbackError;
+      }
+
+      throw new Error(
+        "R2 bucket is not available in this environment. " +
+          "Make sure wrangler.jsonc is properly configured with FILES binding. " +
+          "For local development, ensure @opennextjs/cloudflare is properly initialized in next.config.ts. " +
+          "See docs/development/getting-started.md for more information."
+      );
+    }
   }
 
-  return typedEnv.FILES;
+  return r2Bucket;
 }
 
 /**

@@ -8,13 +8,7 @@ PRAGMA foreign_keys = ON;
 -- 1) USERS (Clerk 동기화)
 CREATE TABLE IF NOT EXISTS users (
   clerk_user_id         TEXT PRIMARY KEY,
-  email                 TEXT UNIQUE NOT NULL,
-  first_name            TEXT,
-  last_name             TEXT,
-  profile_image_url     TEXT,
   language_preference   TEXT NOT NULL DEFAULT 'en',
-  subscription_tier     TEXT CHECK (subscription_tier IN ('free','premium','pro')) DEFAULT 'free',
-  subscription_end_date DATE,
   created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -24,8 +18,6 @@ AFTER UPDATE ON users
 FOR EACH ROW BEGIN
   UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE clerk_user_id = NEW.clerk_user_id;
 END;
-
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- 2) RESUMES
 CREATE TABLE IF NOT EXISTS resumes (
@@ -52,7 +44,28 @@ END;
 CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_resumes_active ON resumes(is_active);
 
--- 3) INTERVIEW QUESTIONS
+-- 3) RESUME HISTORY
+CREATE TABLE IF NOT EXISTS resume_history (
+  history_id      TEXT PRIMARY KEY,
+  resume_id       TEXT NOT NULL,
+  clerk_user_id   TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  content         TEXT,
+  version         INTEGER NOT NULL,
+  file_url        TEXT,
+  ai_feedback     TEXT,
+  score           INTEGER CHECK (score BETWEEN 0 AND 100),
+  change_reason   TEXT,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (resume_id) REFERENCES resumes(resume_id) ON DELETE CASCADE,
+  FOREIGN KEY (clerk_user_id) REFERENCES users(clerk_user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_resume ON resume_history(resume_id);
+CREATE INDEX IF NOT EXISTS idx_history_user ON resume_history(clerk_user_id);
+CREATE INDEX IF NOT EXISTS idx_history_created ON resume_history(created_at);
+
+-- 4) INTERVIEW QUESTIONS
 CREATE TABLE IF NOT EXISTS interview_questions (
   question_id     TEXT PRIMARY KEY,
   resume_id       TEXT NOT NULL,
@@ -72,7 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_q_user ON interview_questions(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_q_resume ON interview_questions(resume_id);
 CREATE INDEX IF NOT EXISTS idx_q_cat_diff ON interview_questions(category, difficulty);
 
--- 4) MOCK INTERVIEW SESSIONS
+-- 5) MOCK INTERVIEW SESSIONS
 CREATE TABLE IF NOT EXISTS mock_interview_sessions (
   session_id      TEXT PRIMARY KEY,
   clerk_user_id   TEXT NOT NULL,
@@ -93,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON mock_interview_sessions(clerk_us
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON mock_interview_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_start ON mock_interview_sessions(start_time);
 
--- 5) INTERVIEW ANSWERS
+-- 6) INTERVIEW ANSWERS
 CREATE TABLE IF NOT EXISTS interview_answers (
   answer_id       TEXT PRIMARY KEY,
   session_id      TEXT NOT NULL,
@@ -111,7 +124,7 @@ CREATE TABLE IF NOT EXISTS interview_answers (
 CREATE INDEX IF NOT EXISTS idx_answers_session ON interview_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_answers_question ON interview_answers(question_id);
 
--- 6) SUBSCRIPTIONS (결제: Toss 우선, 이후 Kakao/Paddle 확장)
+-- 7) SUBSCRIPTIONS (결제: Toss 우선, 이후 Kakao/Paddle 확장)
 CREATE TABLE IF NOT EXISTS subscriptions (
   subscription_id   TEXT PRIMARY KEY,
   clerk_user_id     TEXT NOT NULL UNIQUE,
@@ -136,7 +149,7 @@ END;
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
 
--- 7) USER NOTES
+-- 8) USER NOTES
 CREATE TABLE IF NOT EXISTS user_notes (
   note_id        TEXT PRIMARY KEY,
   clerk_user_id  TEXT NOT NULL,
@@ -158,7 +171,7 @@ END;
 CREATE INDEX IF NOT EXISTS idx_notes_user ON user_notes(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_question ON user_notes(question_id);
 
--- 8) USAGE STATS (집계용; 뷰/트리거로도 확장 가능)
+-- 9) USAGE STATS (집계용; 뷰/트리거로도 확장 가능)
 CREATE TABLE IF NOT EXISTS usage_stats (
   stat_id                     TEXT PRIMARY KEY,
   clerk_user_id               TEXT NOT NULL,
@@ -178,9 +191,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_user_unique ON usage_stats(clerk_use
 -- ============================================================
 
 -- 샘플 사용자 (Clerk 사용자 ID는 실제로는 Clerk에서 생성됨)
-INSERT OR IGNORE INTO users (clerk_user_id, email, first_name, last_name, language_preference, subscription_tier) VALUES
-('user_sample_1', 'demo@prepup.com', 'Demo', 'User', 'en', 'free'),
-('user_sample_2', 'john.doe@example.com', 'John', 'Doe', 'en', 'premium');
+INSERT OR IGNORE INTO users (clerk_user_id, language_preference) VALUES
+('user_sample_1', 'en'),
+('user_sample_2', 'en');
 
 -- 샘플 이력서
 INSERT OR IGNORE INTO resumes (resume_id, clerk_user_id, title, content, version, is_active, score) VALUES

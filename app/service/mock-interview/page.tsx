@@ -1,5 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,12 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { Mic, Play, Clock, Calendar, TrendingUp, Award, BarChart } from "lucide-react";
 
 export default async function MockInterviewPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/auth/sign-in");
-  }
-
   // Mock data
   const stats = {
     totalInterviews: 12,
@@ -174,7 +166,7 @@ export default async function MockInterviewPage() {
               </CardHeader>
               <CardContent>
                 <Button size="lg" variant="secondary" asChild>
-                  <Link href="/dashboard/mock-interview/new">
+                  <Link href="/service/mock-interview/new">
                     <Play className="mr-2 h-5 w-5" />
                     Start New Interview
                   </Link>
@@ -211,7 +203,7 @@ export default async function MockInterviewPage() {
                           </div>
                         </div>
                         <Button variant="outline" size="sm" className="w-full" asChild>
-                          <Link href={`/dashboard/mock-interview/new?type=${type.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                          <Link href={`/service/mock-interview/new?type=${type.name.toLowerCase().replace(/\s+/g, '-')}`}>
                             Start {type.name}
                           </Link>
                         </Button>
@@ -266,12 +258,12 @@ export default async function MockInterviewPage() {
 
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" asChild>
-                            <Link href={`/dashboard/mock-interview/${interview.id}`}>
+                            <Link href={`/service/mock-interview/${interview.id}`}>
                               View Details
                             </Link>
                           </Button>
                           <Button size="sm" variant="outline" asChild>
-                            <Link href={`/dashboard/mock-interview/${interview.id}/recording`}>
+                            <Link href={`/service/mock-interview/${interview.id}/recording`}>
                               <Play className="mr-2 h-3 w-3" />
                               Watch Recording
                             </Link>
@@ -308,7 +300,7 @@ export default async function MockInterviewPage() {
                   </div>
                 ))}
                 <Button variant="outline" className="w-full" size="sm" asChild>
-                  <Link href="/dashboard/mock-interview/schedule">
+                  <Link href="/service/mock-interview/schedule">
                     Schedule New Session
                   </Link>
                 </Button>

@@ -17,6 +17,30 @@
 ## Coding Style & Naming Conventions
 Use TypeScript everywhere; prefer server components unless the UI needs client-side hooks (mark with `"use client"`). Stick to 2-space indentation, camelCase for helpers, PascalCase for React components, and kebab-case for file names. Leverage Tailwind v4 utilities plus `clsx`/`tailwind-merge`; avoid inline styles. Run `npm run lint` before every push; rely on ESLint + Next rules instead of ad-hoc formatting.
 
+## Form Handling & Validation
+For all user input forms (including file uploads, text inputs, and data entry), use **TanStack Form** (`@tanstack/react-form`) for form state management and **Zod** for schema validation. This ensures type-safe, performant form handling with consistent validation patterns across the application.
+
+- Define Zod schemas in the same file as the form component or in a shared `lib/validations/` directory for reusable schemas.
+- Use TanStack Form's `useForm` hook with Zod adapter (`@tanstack/zod-form-adapter`) for seamless integration.
+- Leverage Zod's built-in validators and custom refinements for complex validation logic (e.g., file size limits, format checks).
+- For file uploads, validate file types, sizes, and other constraints using Zod schemas before submission.
+- Keep form logic in client components (`"use client"`); use server actions for form submission and data persistence.
+
+Example pattern:
+```typescript
+import { useForm } from '@tanstack/react-form'
+import { zodValidator } from '@tanstack/zod-form-adapter'
+import { z } from 'zod'
+
+const formSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email'),
+  file: z.instanceof(File).refine(...)
+})
+
+// Use with TanStack Form
+```
+
 ## Testing Guidelines
 Automated tests are not yet wired up; add coverage (React Testing Library or Playwright) or provide a concise QA note. Name future tests `*.test.tsx` and colocate them with the component they exercise. At minimum, run `npm run lint` and validate critical flows locally via `npm run dev`.
 

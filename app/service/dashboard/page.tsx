@@ -1,5 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,12 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, MessageSquare, Mic, TrendingUp, Calendar, Clock, Award } from "lucide-react";
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/auth/sign-in");
-  }
-
   // Mock data
   const stats = {
     resumeReviews: 5,
@@ -103,19 +95,19 @@ export default async function DashboardPage() {
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-4">
                   <Button className="h-24 flex-col gap-2" variant="outline" asChild>
-                    <Link href="/dashboard/resume">
+                    <Link href="/service/resume">
                       <FileText className="h-6 w-6" />
                       <span>Upload Resume</span>
                     </Link>
                   </Button>
                   <Button className="h-24 flex-col gap-2" variant="outline" asChild>
-                    <Link href="/dashboard/questions">
+                    <Link href="/service/questions">
                       <MessageSquare className="h-6 w-6" />
                       <span>Practice Questions</span>
                     </Link>
                   </Button>
                   <Button className="h-24 flex-col gap-2" variant="outline" asChild>
-                    <Link href="/dashboard/mock-interview">
+                    <Link href="/service/mock-interview">
                       <Mic className="h-6 w-6" />
                       <span>Start Mock Interview</span>
                     </Link>
@@ -208,7 +200,7 @@ export default async function DashboardPage() {
                   </div>
                 ))}
                 <Button variant="outline" className="w-full" size="sm" asChild>
-                  <Link href="/dashboard/schedule">View All Sessions</Link>
+                  <Link href="/service/mock-interview/schedule">View All Sessions</Link>
                 </Button>
               </CardContent>
             </Card>

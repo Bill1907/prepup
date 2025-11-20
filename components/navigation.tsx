@@ -30,14 +30,16 @@ export function Navigation() {
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/dashboard"
-              className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                isActive("/dashboard") ? "text-blue-600" : "text-gray-600 dark:text-gray-300"
-              }`}
-            >
-              Dashboard
-            </Link>
+            <SignedIn>
+              <Link
+                href="/service/dashboard"
+                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                  isActive("/service/dashboard") ? "text-blue-600" : "text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                Dashboard
+              </Link>
+            </SignedIn>
             <Link
               href="/about"
               className={`text-sm font-medium transition-colors hover:text-blue-600 ${
@@ -93,31 +95,31 @@ export function Navigation() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="cursor-pointer">
+                    <Link href="/service/dashboard" className="cursor-pointer">
                       Dashboard
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/resume" className="cursor-pointer flex items-center gap-2">
+                    <Link href="/service/resume" className="cursor-pointer flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       Resume
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/questions" className="cursor-pointer flex items-center gap-2">
+                    <Link href="/service/questions" className="cursor-pointer flex items-center gap-2">
                       <MessageSquare className="h-4 w-4" />
                       Questions
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/mock-interview" className="cursor-pointer flex items-center gap-2">
+                    <Link href="/service/mock-interview" className="cursor-pointer flex items-center gap-2">
                       <Mic className="h-4 w-4" />
                       Mock Interview
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/settings" className="cursor-pointer flex items-center gap-2">
+                    <Link href="/service/settings" className="cursor-pointer flex items-center gap-2">
                       <Settings className="h-4 w-4" />
                       Settings
                     </Link>
@@ -150,11 +152,13 @@ export function Navigation() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </SignedOut>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="cursor-pointer">
-                    Dashboard
-                  </Link>
-                </DropdownMenuItem>
+                <SignedIn>
+                  <DropdownMenuItem asChild>
+                    <Link href="/service/dashboard" className="cursor-pointer">
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                </SignedIn>
                 <DropdownMenuItem asChild>
                   <Link href="/about" className="cursor-pointer">
                     About
@@ -178,7 +182,7 @@ export function Navigation() {
                 <SignedIn>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/settings" className="cursor-pointer">
+                    <Link href="/service/settings" className="cursor-pointer">
                       Settings
                     </Link>
                   </DropdownMenuItem>
