@@ -113,7 +113,7 @@ export async function PATCH(
     const updateData: {
       title?: string;
       content?: string | null;
-      isActive?: boolean;
+      isActive?: number;
       version?: number;
     } = {};
 
@@ -144,7 +144,8 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      updateData.isActive = body.is_active;
+      // SQLite uses integer for boolean: 1 for true, 0 for false
+      updateData.isActive = body.is_active ? 1 : 0;
     }
 
     // 업데이트할 필드가 없으면 에러
@@ -247,10 +248,10 @@ export async function DELETE(
       );
     }
 
-    // 소프트 삭제: is_active = false
+    // 소프트 삭제: is_active = 0 (SQLite uses integer for boolean)
     await db
       .update(resumes)
-      .set({ isActive: false })
+      .set({ isActive: 0 })
       .where(eq(resumes.resumeId, resumeId));
 
     return Response.json({

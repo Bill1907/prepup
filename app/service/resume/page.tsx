@@ -3,11 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Edit, Download, Clock, Star, MoreVertical } from "lucide-react";
+import { FileText, Upload } from "lucide-react";
 import { getDrizzleDB } from "@/lib/db";
 import { resumes as resumesTable } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { ResumeCard } from "./components/resume-card";
 
 /**
  * 날짜를 상대 시간 문자열로 변환 (예: "2 hours ago", "1 day ago")
@@ -79,7 +79,7 @@ export default async function ResumePage() {
     .where(
       and(
         eq(resumesTable.clerkUserId, userId),
-        eq(resumesTable.isActive, true)
+        eq(resumesTable.isActive, 1)
       )
     )
     .orderBy(desc(resumesTable.createdAt));
@@ -185,99 +185,7 @@ export default async function ResumePage() {
         ) : (
           <div className="grid gap-6">
             {resumes.map((resume) => (
-            <Card key={resume.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                      <FileText className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{resume.name}</CardTitle>
-                      <CardDescription className="flex items-center gap-4 mt-2">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          Updated {resume.lastUpdated}
-                        </span>
-                        <span>Version {resume.version}</span>
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant={resume.status === "Reviewed" ? "default" : "outline"}
-                    >
-                      {resume.status}
-                    </Badge>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {resume.score > 0 && (
-                  <>
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium">ATS Score</span>
-                          <span className="text-sm font-bold">{resume.score}/100</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${
-                              resume.score >= 90 ? "bg-green-500" : 
-                              resume.score >= 80 ? "bg-blue-500" : 
-                              "bg-yellow-500"
-                            }`}
-                            style={{ width: `${resume.score}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-500">
-                        <Star className="h-5 w-5 fill-current" />
-                        <span className="font-medium">{(resume.score / 20).toFixed(1)}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {resume.feedback && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <strong>AI Feedback:</strong> {resume.feedback}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button variant="default" asChild>
-                    <Link href={`/service/resume/${resume.id}/edit-pdf`}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Resume
-                    </Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href={`/service/resume/${resume.id}`}>
-                      View Details
-                    </Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href={`/service/resume/${resume.id}/download`}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download PDF
-                    </Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href={`/service/resume/${resume.id}/history`}>
-                      <Clock className="mr-2 h-4 w-4" />
-                      History
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <ResumeCard key={resume.id} resume={resume} />
             ))}
           </div>
         )}

@@ -12,6 +12,7 @@ declare namespace Cloudflare {
 		FILES: R2Bucket;
 		prepup_files: R2Bucket;
 		prepup_db: D1Database;
+		AI: Ai;
 		ASSETS: Fetcher;
 	}
 }

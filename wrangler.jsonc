@@ -53,6 +53,13 @@
     },
   ],
   /**
+   * Cloudflare AI Binding
+   */
+  "ai": {
+    "binding": "AI",
+    "remote": true,
+  },
+  /**
    * Environment Variables
    * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
    */

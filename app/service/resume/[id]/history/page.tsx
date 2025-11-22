@@ -102,7 +102,7 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
       and(
         eq(resumes.resumeId, resumeId),
         eq(resumes.clerkUserId, userId),
-        eq(resumes.isActive, true)
+        eq(resumes.isActive, 1) // SQLite uses integer: 1 = true
       )
     )
     .limit(1);

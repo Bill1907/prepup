@@ -13,22 +13,29 @@ const ALLOWED_FILE_TYPES = [
  * 파일명을 안전하게 정리 (특수문자 제거)
  */
 function sanitizeFilename(filename: string): string {
-  const sanitized = filename
-    .replace(/[^a-zA-Z0-9.-]/g, "_")
+  // 확장자 분리
+  const lastDotIndex = filename.lastIndexOf(".");
+  let name = filename;
+  let extension = "";
+  
+  if (lastDotIndex > 0) {
+    name = filename.substring(0, lastDotIndex);
+    extension = filename.substring(lastDotIndex);
+  }
+  
+  // 파일명 sanitize (영문자, 숫자, 하이픈, 언더스코어만 허용)
+  const sanitizedName = name
+    .replace(/[^a-zA-Z0-9-_]/g, "_")
     .replace(/_{2,}/g, "_")
     .replace(/^_|_$/g, "");
   
-  // 파일명이 비어있거나 확장자가 없는 경우 기본값 사용
-  if (!sanitized || sanitized.trim() === "") {
-    return "resume.pdf";
-  }
+  // 파일명이 비어있으면 기본값 사용
+  const finalName = sanitizedName || "resume";
   
-  // 확장자가 없는 경우 .pdf 추가
-  if (!sanitized.includes(".")) {
-    return `${sanitized}.pdf`;
-  }
+  // 확장자가 없으면 .pdf 추가
+  const finalExtension = extension || ".pdf";
   
-  return sanitized;
+  return `${finalName}${finalExtension}`;
 }
 
 /**

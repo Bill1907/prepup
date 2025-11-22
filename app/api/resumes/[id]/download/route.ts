@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB, getFile } from "@/lib/db";
+import { getDrizzleDB, getPresignedUrl } from "@/lib/db";
 import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+
+export const runtime = "edge";
 
 interface RouteParams {
   params: Promise<{
@@ -11,7 +13,8 @@ interface RouteParams {
 
 /**
  * GET /api/resumes/[id]/download
- * 이력서 원본 파일 다운로드
+ * 이력서 원본 파일 다운로드용 Presigned URL로 리다이렉트
+ * S3 호환 API를 사용하여 업로드/프리뷰와 일관성 유지
  */
 export async function GET(
   request: Request,
@@ -57,35 +60,14 @@ export async function GET(
       );
     }
 
-    // R2에서 파일 조회
-    const fileObject = await getFile(resume.fileUrl);
+    // Presigned URL 생성 (GET 요청용, 5분 만료)
+    const presignedUrl = await getPresignedUrl(resume.fileUrl, 300);
 
-    if (!fileObject) {
-      return Response.json(
-        { error: "File not found in storage" },
-        { status: 404 }
-      );
-    }
-
-    // 파일명 추출 (fileUrl에서 또는 메타데이터에서)
-    const fileName = resume.fileUrl.split("/").pop() || "resume.pdf";
-    const originalFilename = fileObject.customMetadata?.originalFilename || fileName;
-
-    // 파일 확장자 확인
-    const contentType =
-      fileObject.httpMetadata?.contentType || "application/pdf";
-
-    // 다운로드용 헤더 설정
-    return new Response(fileObject.body, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": fileObject.size.toString(),
-        "Content-Disposition": `attachment; filename="${originalFilename}"`,
-        "Cache-Control": "private, no-cache",
-      },
-    });
+    // Presigned URL로 리다이렉트
+    // 브라우저가 직접 R2에서 다운로드하므로 Workers 대역폭 절약
+    return Response.redirect(presignedUrl, 302);
   } catch (error) {
-    console.error("Error downloading resume file:", error);
+    console.error("Error generating download URL:", error);
     return Response.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -4,6 +4,12 @@
 - `app/` hosts the Next.js 15 App Router tree; route groups mirror user flows. Keep server actions in `app/actions` and shared layouts in `app/(shared)/`.
 - `components/` contains reusable UI built on shadcn/Radix; colocate variants, hooks, and accompanying styles in the same subfolder.
 - `lib/` stores pure utilities (API clients, formatting helpers). Anything that touches browser APIs should stay inside `app/` or `components/`.
+  - `lib/db/` contains database-related utilities organized by domain:
+    - `lib/db/index.ts` - Core DB setup (Drizzle, R2, etc.) and re-exports domain functions
+    - `lib/db/schema.ts` - Drizzle ORM schema definitions
+    - `lib/db/{domain}/index.ts` - Domain-specific data access functions (e.g., `lib/db/resume/index.ts`)
+    - Keep DB queries and data access logic in domain modules, not in page components
+    - Example: `import { getResumeById } from "@/lib/db"` (re-exported from `lib/db/resume/index.ts`)
 - Static assets live in `public/`; Cloudflare bindings and runtime contracts are captured in `cloudflare-env.d.ts`, `wrangler.jsonc`, and `open-next.config.ts`.
 
 ## Build, Test, and Development Commands

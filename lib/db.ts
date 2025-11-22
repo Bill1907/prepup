@@ -8,7 +8,7 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 // Drizzle ORM re-export (편의를 위해)
-export { getDrizzleDB, ensureUserExists } from "./db/index";
+export { getDrizzleDB, ensureUserExists, getPresignedUrl } from "./db/index";
 export * from "./db/schema";
 
 /**

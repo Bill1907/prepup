@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Removed pdfjs-dist from serverExternalPackages since we're using it client-side only
+  // Turbopack configuration for Next.js 16+
+  // Empty config to silence the Turbopack warning
+  turbopack: {},
+  // Keep webpack config for backwards compatibility when using --webpack flag
+  webpack: (config) => {
+    config.resolve.alias.canvas = false;
+    return config;
+  },
 };
 
 export default nextConfig;

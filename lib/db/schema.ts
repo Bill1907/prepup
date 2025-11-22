@@ -59,7 +59,7 @@ export const resumes = sqliteTable(
     title: text("title").notNull(),
     content: text("content"),
     version: integer("version").notNull().default(1),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    isActive: integer("is_active").notNull().default(1),
     fileUrl: text("file_url"),
     aiFeedback: text("ai_feedback"), // JSON as TEXT
     score: integer("score"), // CHECK (score BETWEEN 0 AND 100)

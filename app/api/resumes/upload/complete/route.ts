@@ -1,7 +1,9 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getDrizzleDB, ensureUserExists } from "@/lib/db/index";
+import { getDrizzleDB, ensureUserExists, getFile } from "@/lib/db/index";
 import { resumes } from "@/lib/db/schema";
 import type { NewResume } from "@/types/database";
+
+export const runtime = "edge";
 
 /**
  * POST /api/resumes/upload/complete
@@ -34,6 +36,23 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid file key" }, { status: 403 });
     }
 
+    // 중요: R2에 파일이 실제로 업로드되었는지 검증
+    console.log(`[UPLOAD] Verifying file exists in R2: ${body.fileKey}`);
+    const fileObject = await getFile(body.fileKey);
+    
+    if (!fileObject) {
+      console.error(`[UPLOAD] File not found in R2: ${body.fileKey}`);
+      return Response.json(
+        { 
+          error: "File upload failed. The file was not found in storage. Please try again.",
+          fileKey: body.fileKey
+        },
+        { status: 400 }
+      );
+    }
+    
+    console.log(`[UPLOAD] File verified in R2: ${body.fileKey}, size: ${fileObject.size} bytes`);
+
     const db = getDrizzleDB();
 
     // 사용자가 존재하는지 확인하고, 없으면 생성
@@ -56,7 +75,7 @@ export async function POST(request: Request) {
       title: resumeTitle,
       content: null,
       version: 1,
-      isActive: true,
+      isActive: 1, // SQLite uses integer for boolean: 1 = true
       fileUrl: body.fileKey,
     };
 

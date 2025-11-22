@@ -1,22 +1,28 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  Edit, 
-  Download, 
-  Clock, 
-  Star, 
+import {
+  FileText,
+  Download,
+  Star,
   ArrowLeft,
-  Trash2,
-  History
+  History,
+  Edit,
 } from "lucide-react";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { getResumeById } from "@/lib/db/resume";
+import { ResumeActions } from "./components/resume-actions";
+import { PdfViewerWrapper } from "./components/pdf-viewer-wrapper";
+import { AnalyzeButton } from "./components/analyze-button";
+import { FilePreviewNonPdf } from "./components/file-preview-non-pdf";
 
 /**
  * 날짜 포맷팅
@@ -37,7 +43,7 @@ function formatDate(dateString: string): string {
  */
 function parseAIFeedback(aiFeedback: string | null): string {
   if (!aiFeedback) return "";
-  
+
   try {
     const parsed = JSON.parse(aiFeedback);
     if (typeof parsed === "string") {
@@ -71,31 +77,14 @@ export default async function ResumeDetailPage({ params }: PageProps) {
   const { id } = await params;
   const resumeId = id;
 
-  const db = getDrizzleDB();
-
-  // 이력서 조회
-  const [resume] = await db
-    .select()
-    .from(resumes)
-    .where(
-      and(
-        eq(resumes.resumeId, resumeId),
-        eq(resumes.clerkUserId, userId),
-        eq(resumes.isActive, true)
-      )
-    )
-    .limit(1);
+  // 이력서 조회 (본인의 이력서만, 권한 검증 포함)
+  const resume = await getResumeById(resumeId, userId);
 
   if (!resume) {
     notFound();
   }
 
-  // 파일 미리보기 URL 생성
-  const filePreviewUrl = resume.fileUrl 
-    ? `/api/files/${resume.fileUrl}`
-    : null;
-
-  const isPdf = resume.fileUrl?.endsWith(".pdf") || resume.fileUrl?.includes("application/pdf");
+  const isPdf = resume.fileUrl?.toLowerCase().endsWith(".pdf") || false;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -114,7 +103,9 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                 {resume.title}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Version {resume.version} • Created {formatDate(resume.createdAt)} • Updated {formatDate(resume.updatedAt)}
+                Version {resume.version} • Created{" "}
+                {formatDate(resume.createdAt)} • Updated{" "}
+                {formatDate(resume.updatedAt)}
               </p>
             </div>
             <div className="flex gap-2">
@@ -124,14 +115,6 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                   History
                 </Link>
               </Button>
-              {isPdf && resume.fileUrl ? (
-                <Button variant="default" asChild>
-                  <Link href={`/service/resume/${resumeId}/edit-pdf`}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit PDF
-                  </Link>
-                </Button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -146,7 +129,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Badge 
+                  <Badge
                     variant={resume.score !== null ? "default" : "outline"}
                     className="mb-2"
                   >
@@ -158,7 +141,9 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">ATS Score</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold">{resume.score}/100</span>
+                        <span className="text-lg font-bold">
+                          {resume.score}/100
+                        </span>
                         <div className="flex items-center gap-1 text-yellow-500">
                           <Star className="h-4 w-4 fill-current" />
                           <span className="text-sm font-medium">
@@ -168,17 +153,27 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className={`h-2 rounded-full ${
-                          resume.score >= 90 ? "bg-green-500" : 
-                          resume.score >= 80 ? "bg-blue-500" : 
-                          "bg-yellow-500"
+                          resume.score >= 90
+                            ? "bg-green-500"
+                            : resume.score >= 80
+                              ? "bg-blue-500"
+                              : "bg-yellow-500"
                         }`}
                         style={{ width: `${resume.score}%` }}
                       />
                     </div>
                   </>
                 )}
+
+                <div className="pt-2">
+                  <AnalyzeButton
+                    resumeId={resumeId}
+                    fileUrl={resume.fileUrl}
+                    isPdf={isPdf}
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -201,27 +196,12 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               <CardHeader>
                 <CardTitle>Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="default" className="w-full" asChild>
-                  <Link href={`/service/resume/${resumeId}/download`}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
-                  </Link>
-                </Button>
-                {isPdf && resume.fileUrl ? (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/service/resume/${resumeId}/edit-pdf`}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit PDF
-                    </Link>
-                  </Button>
-                ) : null}
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/service/resume/${resumeId}/history`}>
-                    <History className="mr-2 h-4 w-4" />
-                    View History
-                  </Link>
-                </Button>
+              <CardContent>
+                <ResumeActions
+                  resumeId={resumeId}
+                  hasFile={!!resume.fileUrl}
+                  isPdf={isPdf}
+                />
               </CardContent>
             </Card>
 
@@ -246,35 +226,21 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               <CardHeader>
                 <CardTitle>Resume Preview</CardTitle>
                 <CardDescription>
-                  {resume.fileUrl ? (
-                    `File: ${resume.fileUrl.split("/").pop()}`
-                  ) : (
-                    "No file uploaded"
-                  )}
+                  {resume.fileUrl
+                    ? `File: ${resume.fileUrl.split("/").pop()}`
+                    : "No file uploaded"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {filePreviewUrl ? (
+                {resume.fileUrl ? (
                   <div className="w-full">
                     {isPdf ? (
-                      <iframe
-                        src={filePreviewUrl}
-                        className="w-full h-[800px] border rounded-lg"
-                        title="Resume Preview"
+                      <PdfViewerWrapper
+                        fileUrl={resume.fileUrl}
+                        resumeId={resumeId}
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center p-12 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                        <FileText className="h-16 w-16 text-gray-400 mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">
-                          Preview not available for this file type
-                        </p>
-                        <Button asChild>
-                          <a href={filePreviewUrl} download>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download File
-                          </a>
-                        </Button>
-                      </div>
+                      <FilePreviewNonPdf fileUrl={resume.fileUrl} />
                     )}
                   </div>
                 ) : (
@@ -284,7 +250,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                       No file uploaded
                     </p>
                     <Button asChild>
-                      <Link href={`/service/resume/${resumeId}/edit`}>
+                      <Link href={`/service/resume/upload`}>
                         <Edit className="mr-2 h-4 w-4" />
                         Upload File
                       </Link>
@@ -299,4 +265,3 @@ export default async function ResumeDetailPage({ params }: PageProps) {
     </div>
   );
 }
-

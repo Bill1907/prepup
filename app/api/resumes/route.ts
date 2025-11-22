@@ -27,7 +27,7 @@ export async function GET() {
       .where(
         and(
           eq(resumes.clerkUserId, userId),
-          eq(resumes.isActive, true)
+          eq(resumes.isActive, 1) // SQLite uses integer: 1 = true
         )
       )
       .orderBy(desc(resumes.createdAt));
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       title: body.title.trim(),
       content: body.content?.trim() || null,
       version: 1,
-      isActive: true,
+      isActive: 1, // SQLite uses integer for boolean: 1 = true
     };
 
     const [createdResume] = await db
