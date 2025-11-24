@@ -1,6 +1,6 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNotNull } from "drizzle-orm";
 import { getDrizzleDB } from "./core";
-import { resumes } from "./schema";
+import { resumes, resumeHistory } from "./schema";
 
 /**
  * 이력서 상세 정보 조회 (권한 검증 포함)
@@ -57,5 +57,30 @@ export async function getActiveResumesByUserId(
       )
     )
     .orderBy(desc(resumes.createdAt));
+}
+
+/**
+ * 이력서의 AI 리뷰 히스토리 조회 (권한 검증 포함)
+ * @param resumeId 이력서 ID
+ * @param userId Clerk 사용자 ID
+ * @returns AI 피드백이 있는 히스토리 목록 (최신순)
+ */
+export async function getResumeHistoryWithAI(
+  resumeId: string,
+  userId: string
+): Promise<Array<typeof resumeHistory.$inferSelect>> {
+  const db = getDrizzleDB();
+
+  return await db
+    .select()
+    .from(resumeHistory)
+    .where(
+      and(
+        eq(resumeHistory.resumeId, resumeId),
+        eq(resumeHistory.clerkUserId, userId),
+        isNotNull(resumeHistory.aiFeedback)
+      )
+    )
+    .orderBy(desc(resumeHistory.createdAt));
 }
 

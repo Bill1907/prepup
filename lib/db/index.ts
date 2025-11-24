@@ -175,4 +175,4 @@ export * from "./schema";
  * 도메인별 데이터 접근 함수 export
  * Resume 도메인
  */
-export { getResumeById, getActiveResumesByUserId } from "./resume";
+export * from "./resume";

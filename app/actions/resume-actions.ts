@@ -217,7 +217,19 @@ Return ONLY valid JSON, nothing else.`,
 
       const analysisData: ResumeAnalysisData = JSON.parse(responseText);
 
-      // 7) 정리 (파일 및 Assistant 삭제)
+      // 7) DB에 분석 결과 저장
+      await db
+        .update(resumes)
+        .set({
+          aiFeedback: JSON.stringify(analysisData),
+          score: analysisData.score,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(resumes.resumeId, resumeId));
+
+      console.log("[ANALYZE] Analysis saved to DB for resume:", resumeId);
+
+      // 8) 정리 (파일 및 Assistant 삭제)
       await openai.files.delete(fileId).catch(console.error);
       await openai.beta.assistants.delete(assistant.id).catch(console.error);
 

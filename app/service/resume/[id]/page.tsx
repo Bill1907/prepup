@@ -11,14 +11,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   FileText,
   Download,
   Star,
   ArrowLeft,
   History,
   Edit,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
-import { getResumeById } from "@/lib/db/resume";
+import { getResumeById, getResumeHistoryWithAI, resumeHistory } from "@/lib/db";
 import { ResumeActions } from "./components/resume-actions";
 import { PdfViewerWrapper } from "./components/pdf-viewer-wrapper";
 import { AnalyzeButton } from "./components/analyze-button";
@@ -39,26 +48,127 @@ function formatDate(dateString: string): string {
 }
 
 /**
+ * AI Feedback 타입 정의
+ */
+interface AIFeedbackData {
+  summary: string;
+  score: number;
+  strengths: string[];
+  improvements: string[];
+}
+
+/**
  * AI Feedback 파싱
  */
-function parseAIFeedback(aiFeedback: string | null): string {
-  if (!aiFeedback) return "";
+function parseAIFeedback(aiFeedback: string | null): AIFeedbackData | null {
+  if (!aiFeedback) return null;
 
   try {
     const parsed = JSON.parse(aiFeedback);
+
+    // 이미 구조화된 데이터인 경우
+    if (
+      parsed.summary &&
+      Array.isArray(parsed.strengths) &&
+      Array.isArray(parsed.improvements)
+    ) {
+      return parsed as AIFeedbackData;
+    }
+
+    // 레거시 포맷 처리
     if (typeof parsed === "string") {
-      return parsed;
+      return {
+        summary: parsed,
+        score: 0,
+        strengths: [],
+        improvements: [],
+      };
     }
-    if (parsed.summary) {
-      return parsed.summary;
-    }
+
     if (parsed.overall_feedback) {
-      return parsed.overall_feedback;
+      return {
+        summary: parsed.overall_feedback,
+        score: parsed.score || 0,
+        strengths: parsed.strengths || [],
+        improvements: parsed.improvements || [],
+      };
     }
-    return JSON.stringify(parsed);
+
+    return null;
   } catch {
-    return aiFeedback;
+    // JSON 파싱 실패시 텍스트로 처리
+    return {
+      summary: aiFeedback,
+      score: 0,
+      strengths: [],
+      improvements: [],
+    };
   }
+}
+
+/**
+ * AI Feedback 표시 컴포넌트
+ */
+function AIFeedbackDisplay({ feedback }: { feedback: AIFeedbackData | null }) {
+  if (!feedback) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      {feedback.summary && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            Summary
+          </h4>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            {feedback.summary}
+          </p>
+        </div>
+      )}
+
+      {/* Strengths */}
+      {feedback.strengths && feedback.strengths.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Strengths
+          </h4>
+          <ul className="space-y-1">
+            {feedback.strengths.map((strength, idx) => (
+              <li
+                key={idx}
+                className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2"
+              >
+                <span className="text-green-500 mt-1">•</span>
+                <span>{strength}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Improvements */}
+      {feedback.improvements && feedback.improvements.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            Areas for Improvement
+          </h4>
+          <ul className="space-y-1">
+            {feedback.improvements.map((improvement, idx) => (
+              <li
+                key={idx}
+                className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2"
+              >
+                <span className="text-amber-500 mt-1">•</span>
+                <span>{improvement}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface PageProps {
@@ -84,7 +194,11 @@ export default async function ResumeDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  // AI 리뷰 히스토리 조회
+  const aiHistory = await getResumeHistoryWithAI(resumeId, userId);
+
   const isPdf = resume.fileUrl?.toLowerCase().endsWith(".pdf") || false;
+  const currentFeedback = parseAIFeedback(resume.aiFeedback);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -178,15 +292,75 @@ export default async function ResumeDetailPage({ params }: PageProps) {
             </Card>
 
             {/* AI Feedback Card */}
-            {resume.aiFeedback && (
+            {currentFeedback && (
               <Card>
                 <CardHeader>
-                  <CardTitle>AI Feedback</CardTitle>
+                  <CardTitle>Current AI Review</CardTitle>
+                  <CardDescription>
+                    Latest analysis of your resume
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {parseAIFeedback(resume.aiFeedback)}
-                  </p>
+                  <AIFeedbackDisplay feedback={currentFeedback} />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Historical AI Reviews */}
+            {aiHistory.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Review History</CardTitle>
+                  <CardDescription>
+                    Previous AI analyses ({aiHistory.length} review
+                    {aiHistory.length !== 1 ? "s" : ""})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="single" collapsible className="w-full">
+                    {aiHistory.map(
+                      (
+                        historyItem: typeof resumeHistory.$inferSelect,
+                        index: number
+                      ) => {
+                        const historyFeedback = parseAIFeedback(
+                          historyItem.aiFeedback
+                        );
+                        return (
+                          <AccordionItem
+                            key={historyItem.historyId}
+                            value={`item-${index}`}
+                          >
+                            <AccordionTrigger className="hover:no-underline">
+                              <div className="flex items-center justify-between w-full pr-4">
+                                <div className="flex items-center gap-3">
+                                  <Clock className="h-4 w-4 text-gray-500" />
+                                  <div className="text-left">
+                                    <div className="text-sm font-medium">
+                                      Version {historyItem.version}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {formatDate(historyItem.createdAt)}
+                                    </div>
+                                  </div>
+                                </div>
+                                {historyItem.score !== null && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    Score: {historyItem.score}/100
+                                  </Badge>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="pt-4">
+                                <AIFeedbackDisplay feedback={historyFeedback} />
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      }
+                    )}
+                  </Accordion>
                 </CardContent>
               </Card>
             )}
