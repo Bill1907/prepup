@@ -9,6 +9,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 ## 🚀 Features
 
 ### 1. Landing Page
+
 - Hero section with value proposition
 - Feature overview (Resume, Interview Questions, Mock Interview)
 - CTA buttons (Sign Up, Try Demo)
@@ -18,6 +19,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Newsletter signup
 
 ### 2. Authentication
+
 - Sign Up page with Clerk integration
 - Login page
 - Password reset functionality
@@ -25,6 +27,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Protected routes for dashboard
 
 ### 3. User Dashboard
+
 - Overview dashboard with quick access to features
 - User profile and settings
 - Usage statistics and progress tracking
@@ -33,6 +36,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Weekly progress metrics
 
 ### 4. Resume Management Module
+
 - Resume upload/editor page
 - AI-powered feedback and suggestions
 - ATS optimization scoring
@@ -42,6 +46,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Version comparison
 
 ### 5. Interview Preparation Module
+
 - AI-powered interview question generator (resume-based)
 - Question library with categories:
   - Behavioral
@@ -55,6 +60,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Practice tracking
 
 ### 6. Mock Interview Module (Voice AI)
+
 - Voice AI interviewer integration
 - Real-time conversation page
 - Multiple interview types:
@@ -68,6 +74,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Performance insights dashboard
 
 ### 7. User Settings & Account Management
+
 - Profile settings (name, email, language preferences, timezone)
 - Current role and target role configuration
 - Subscription management and billing
@@ -78,6 +85,7 @@ PrepUp is a comprehensive interview preparation platform that uses AI to help jo
 - Account deletion and data export
 
 ### 8. Additional Pages
+
 - **About Us**: Company story, values, team, impact stats
 - **Terms of Service**: Complete legal terms
 - **Privacy Policy**: Comprehensive privacy information
@@ -169,6 +177,7 @@ npm run dev
 ## 🎨 UI Components
 
 The project uses shadcn/ui components with the following installed:
+
 - Button, Card, Input, Textarea
 - Accordion, Tabs, Badge, Avatar
 - Select, Dropdown Menu, Dialog
@@ -178,6 +187,7 @@ The project uses shadcn/ui components with the following installed:
 ## 🔐 Authentication
 
 Authentication is handled by Clerk with the following routes protected:
+
 - `/dashboard/*` - All dashboard routes require authentication
 
 ## 🌐 Deployment
@@ -191,26 +201,31 @@ npm run deploy
 ## 📚 주요 문서
 
 ### 시작하기
+
 - [개발 환경 설정](./docs/development/getting-started.md) - 로컬 개발 환경 구축
 - [한글 가이드](./docs/guides/korean-guide.md) - 완전한 한국어 가이드
 
 ### 데이터베이스
+
 - [데이터베이스 빠른 시작](./docs/database/quick-start.md) - 5분 안에 D1 & R2 설정
 - [데이터베이스 스키마](./docs/database/schema.md) - 전체 스키마 문서
 - [쿼리 예제](./docs/database/queries.md) - 자주 사용하는 쿼리
 - [마이그레이션 가이드](./docs/database/migration.md) - 데이터베이스 마이그레이션
 
 ### API & 인증
+
 - [Clerk 인증 설정](./docs/api/authentication.md) - Clerk 통합 가이드
 - [API 엔드포인트](./docs/api/endpoints.md) - REST API 문서
 
 ### 배포
+
 - [Cloudflare 배포](./docs/deployment/cloudflare.md) - Cloudflare Workers 배포 가이드
 - [환경 변수 관리](./docs/deployment/environment.md) - 환경 변수 설정
 
 ## 📄 환경 변수
 
 필수 환경 변수:
+
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk 공개 키
 - `CLERK_SECRET_KEY` - Clerk 비밀 키
 - `CLERK_WEBHOOK_SECRET` - Clerk Webhook 시크릿
@@ -220,20 +235,25 @@ npm run deploy
 ## 🎯 Key Features Implementation
 
 ### Mock Data
+
 All pages currently use mock data for demonstration purposes. In production, these would be replaced with actual API calls to your backend services.
 
 ### Protected Routes
+
 The middleware protects all `/dashboard/*` routes, requiring authentication before access.
 
 ### Responsive Design
+
 All pages are fully responsive and work on mobile, tablet, and desktop devices.
 
 ### Dark Mode Support
+
 The application supports dark mode through Tailwind's dark mode configuration.
 
 ## 🤝 Contributing
 
 This is a demo project. For production use, consider:
+
 - Implementing actual API endpoints
 - Adding real AI integration
 - Setting up a database

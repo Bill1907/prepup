@@ -45,7 +45,8 @@ npm run dev
 
 브라우저에서 `http://localhost:3000` 열기 🎉
 
-**참고**: 
+**참고**:
+
 - `wrangler.jsonc`에서 `"remote": true`로 설정되어 있어 원격 D1이 기본값입니다.
 - `@cloudflare/next-on-pages`가 로컬 개발 환경에서도 동작하여 원격 D1에 자동으로 연결됩니다.
 
@@ -97,7 +98,8 @@ npx wrangler d1 execute prepup-db --local --file=./schema.sql
 npx wrangler d1 execute prepup-db --local --command="SELECT COUNT(*) FROM users"
 ```
 
-**참고**: 
+**참고**:
+
 - `wrangler.jsonc`에서 `"remote": true`로 설정되어 있어 원격 D1이 기본값입니다.
 - 원격 D1을 사용하면 로컬에서 별도 설정 없이 바로 개발할 수 있습니다.
 
@@ -279,8 +281,8 @@ npx wrangler d1 execute prepup-db --local --command="SELECT sql FROM sqlite_mast
 
 ```typescript
 // 개발 모드에서 사용자 정보 출력
-console.log('User ID:', userId);
-console.log('Session:', await auth());
+console.log("User ID:", userId);
+console.log("Session:", await auth());
 ```
 
 ---
@@ -405,4 +407,3 @@ chore: 빌드/설정 변경
 **준비 완료!** 이제 개발을 시작할 수 있습니다! 🚀
 
 질문이 있으시면 [GitHub Issues](https://github.com/prepup/prepup/issues)에 올려주세요.
-

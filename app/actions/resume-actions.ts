@@ -1,11 +1,11 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDrizzleDB } from "@/lib/db";
 import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { openai } from "@/lib/openaiClient";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -29,10 +29,7 @@ export async function deleteResume(resumeId: string) {
       .select()
       .from(resumes)
       .where(
-        and(
-          eq(resumes.resumeId, resumeId),
-          eq(resumes.clerkUserId, userId)
-        )
+        and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId))
       )
       .limit(1);
 
@@ -68,119 +65,124 @@ export async function deleteResume(resumeId: string) {
   }
 }
 
+interface ResumeAnalysisData {
+  summary: string;
+  score: number;
+  strengths: string[];
+  improvements: string[];
+}
+
 interface AnalyzeResult {
   success: boolean;
   error?: string;
+  analysis?: ResumeAnalysisData;
 }
 
 /**
- * AI 이력서 분석
+ * AI 이력서 분석 (JSON Mode 사용)
  */
-export async function analyzeResume(resumeId: string, extractedText: string): Promise<AnalyzeResult> {
+export async function analyzeResume(
+  resumeId: string,
+  extractedText: string
+): Promise<AnalyzeResult> {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
     const db = getDrizzleDB();
-    
+
     // Verify ownership
     const [resume] = await db
       .select()
       .from(resumes)
-      .where(and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId)))
+      .where(
+        and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId))
+      )
       .limit(1);
 
     if (!resume) return { success: false, error: "Resume not found" };
 
-    // Cloudflare AI Analysis
-    let aiResponse: { summary: string; score: number; overall_feedback: string };
-    
     try {
-       // Get Cloudflare Context to access bindings
-       let env;
-       try {
-         // @ts-ignore - Type definition might be tricky in dev
-         const cfContext = await getCloudflareContext();
-         env = cfContext.env;
-       } catch (e) {
-         console.warn("Cloudflare context not found. This is expected in local 'next dev'. Use 'npm run preview' or 'wrangler dev'.");
-       }
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert resume analyzer and career coach. Analyze resumes and provide structured feedback.",
+          },
+          {
+            role: "user",
+            content: `Analyze the following resume and provide detailed feedback:
 
-       if (!env || !env.AI) {
-         console.error("AI binding is missing");
-         return { success: false, error: "AI service unavailable. Please try again later." };
-       }
+Resume Content:
+"""
+${extractedText.substring(0, 12000)}
+"""
 
-       const prompt = `
-         You are an expert resume analyzer / career coach.
-         Analyze the following resume text.
-         
-         Resume Content:
-         """
-         ${extractedText.substring(0, 12000)}
-         """
-         
-         Provide the following in strict JSON format:
-         {
-           "summary": "A 2-3 sentence professional summary of the candidate.",
-           "score": <number 0-100 based on completeness, impact, and clarity>,
-           "overall_feedback": "3-4 key bullet points on what is good and what to improve."
-         }
-         
-         Do not output markdown code blocks. Just the raw JSON string.
-       `;
+Provide:
+1. A professional summary (2-3 sentences)
+2. A score from 0-100 based on completeness, impact, and clarity
+3. Key strengths (2-5 bullet points)
+4. Areas for improvement (2-5 bullet points)`,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "resume_analysis",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                summary: {
+                  type: "string",
+                  description:
+                    "A 2-3 sentence professional summary of the candidate",
+                },
+                score: {
+                  type: "number",
+                  description:
+                    "A score from 0-100 based on completeness, impact, and clarity",
+                },
+                strengths: {
+                  type: "array",
+                  description: "List of key strengths found in the resume",
+                  items: {
+                    type: "string",
+                  },
+                },
+                improvements: {
+                  type: "array",
+                  description: "List of areas that need improvement",
+                  items: {
+                    type: "string",
+                  },
+                },
+              },
+              required: ["summary", "score", "strengths", "improvements"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
 
-       // Using Llama 3 8B Instruct
-       const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-         messages: [
-            { role: 'system', content: 'You are a helpful assistant that outputs only valid JSON.' },
-            { role: 'user', content: prompt }
-         ]
-       });
+      // Parse the structured response
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error("No response from AI");
+      }
 
-       const resultText = (response as any).response || "";
-       const jsonStr = resultText.replace(/```json\n?|\n?```/g, "").trim();
-       
-       try {
-         aiResponse = JSON.parse(jsonStr);
-       } catch (e) {
-         console.error("Failed to parse AI JSON:", jsonStr);
-         // Fallback attempt: try to find JSON object pattern
-         const match = jsonStr.match(/\{[\s\S]*\}/);
-         if (match) {
-             aiResponse = JSON.parse(match[0]);
-         } else {
-             throw new Error("Invalid JSON response from AI");
-         }
-       }
-       
-       // Validate score
-       if (typeof aiResponse.score !== 'number') aiResponse.score = 70;
+      const analysisData: ResumeAnalysisData = JSON.parse(responseContent);
 
-    } catch (aiErr) {
-      console.error("AI Analysis Error:", aiErr);
-      return { success: false, error: "AI analysis failed to process the resume." };
+      revalidatePath(`/service/resume/${resumeId}`);
+      return { success: true, analysis: analysisData };
+    } catch (error) {
+      console.error("Server Action Error:", error);
+      return { success: false, error: "Internal server error" };
     }
-
-    // Update DB
-    await db
-      .update(resumes)
-      .set({
-        content: extractedText,
-        score: aiResponse.score,
-        aiFeedback: JSON.stringify({
-           summary: aiResponse.summary,
-           overall_feedback: aiResponse.overall_feedback
-        }),
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(resumes.resumeId, resumeId));
-
-    revalidatePath(`/service/resume/${resumeId}`);
-    return { success: true };
-
   } catch (error) {
-    console.error("Server Action Error:", error);
-    return { success: false, error: "Internal server error" };
+    console.error("Analyze Resume Error:", error);
+    return { success: false, error: "Failed to analyze resume" };
   }
 }

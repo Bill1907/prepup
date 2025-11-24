@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "@tanstack/react-form";
-import { zodValidator } from "@tanstack/zod-form-adapter";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,13 +106,16 @@ export function ResumeActions({
         );
 
         if (!presignedResponse.ok) {
-          const errorData = (await presignedResponse.json().catch(() => ({}))) as { error?: string };
-          throw new Error(
-            errorData.error || "Failed to generate upload URL"
-          );
+          const errorData = (await presignedResponse
+            .json()
+            .catch(() => ({}))) as { error?: string };
+          throw new Error(errorData.error || "Failed to generate upload URL");
         }
 
-        const { presignedUrl, fileKey } = (await presignedResponse.json()) as { presignedUrl: string; fileKey: string };
+        const { presignedUrl, fileKey } = (await presignedResponse.json()) as {
+          presignedUrl: string;
+          fileKey: string;
+        };
 
         // 2. Upload file to R2
         const uploadResponse = await fetch(presignedUrl, {
@@ -141,12 +143,14 @@ export function ResumeActions({
         });
 
         if (!updateResponse.ok) {
-          const errorData = (await updateResponse.json().catch(() => ({}))) as { error?: string };
+          const errorData = (await updateResponse.json().catch(() => ({}))) as {
+            error?: string;
+          };
           throw new Error(errorData.error || "Failed to update resume");
         }
 
         setUploadStatus("success");
-        
+
         // Close dialog and refresh after a short delay
         setTimeout(() => {
           setIsOpen(false);
@@ -154,12 +158,13 @@ export function ResumeActions({
           form.reset();
           router.refresh();
         }, 1500);
-
       } catch (error) {
         console.error("Upload error:", error);
         setUploadStatus("error");
         setUploadError(
-          error instanceof Error ? error.message : "An unexpected error occurred"
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred"
         );
       }
     },
@@ -192,10 +197,11 @@ export function ResumeActions({
           <DialogHeader>
             <DialogTitle>Update Resume File</DialogTitle>
             <DialogDescription>
-              Upload a new version of your resume. This will create a new history entry.
+              Upload a new version of your resume. This will create a new
+              history entry.
             </DialogDescription>
           </DialogHeader>
-          
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -218,7 +224,10 @@ export function ResumeActions({
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       onChange={handleFileSelect}
                       className="cursor-pointer"
-                      disabled={uploadStatus === "uploading" || uploadStatus === "success"}
+                      disabled={
+                        uploadStatus === "uploading" ||
+                        uploadStatus === "success"
+                      }
                     />
                   </div>
                   {field.state.meta.errors.length > 0 && (
@@ -242,9 +251,11 @@ export function ResumeActions({
                     placeholder="e.g., Updated work experience, Added new skills"
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={uploadStatus === "uploading" || uploadStatus === "success"}
+                    disabled={
+                      uploadStatus === "uploading" || uploadStatus === "success"
+                    }
                   />
-                   {field.state.meta.errors.length > 0 && (
+                  {field.state.meta.errors.length > 0 && (
                     <p className="text-sm text-red-500 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
                       {field.state.meta.errors[0]}
@@ -274,13 +285,17 @@ export function ResumeActions({
                 type="button"
                 variant="secondary"
                 onClick={() => setIsOpen(false)}
-                disabled={uploadStatus === "uploading" || uploadStatus === "success"}
+                disabled={
+                  uploadStatus === "uploading" || uploadStatus === "success"
+                }
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={uploadStatus === "uploading" || uploadStatus === "success"}
+              <Button
+                type="submit"
+                disabled={
+                  uploadStatus === "uploading" || uploadStatus === "success"
+                }
               >
                 {uploadStatus === "uploading" ? (
                   <>
@@ -305,4 +320,3 @@ export function ResumeActions({
     </div>
   );
 }
-

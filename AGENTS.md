@@ -53,5 +53,63 @@ Automated tests are not yet wired up; add coverage (React Testing Library or Pla
 ## Commit & Pull Request Guidelines
 Follow the existing history style: present-tense, descriptive summaries (e.g., "Enhance PrepUp platform"). Reference related issues in the body, list key changes, and note any config or schema updates. Pull requests should include screenshots or Looms for UI changes, deployment considerations for Cloudflare, and confirmation that `npm run lint`/`npm run build` succeed. Request review before merging to protect the main branch.
 
+## AI Integration Guidelines
+The project uses **OpenAI GPT-5** for AI-powered features, specifically for resume analysis. All AI-related logic should follow these patterns:
+
+### Environment Configuration
+- **Development:** Store the OpenAI API key in `.env.local` at the project root:
+  ```
+  OPENAI_API_KEY=sk-...
+  ```
+- **Production:** Store the API key in Cloudflare Secrets using Wrangler:
+  ```bash
+  wrangler secret put OPENAI_API_KEY
+  ```
+- Never commit API keys to version control. `.env.local` and `.env*` files are automatically ignored via `.gitignore`.
+
+### Using OpenAI in Server Actions
+When implementing AI features in server actions (`app/actions/`):
+
+```typescript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const completion = await openai.chat.completions.create({
+  model: "gpt-5",
+  messages: [...],
+  response_format: {
+    type: "json_schema",
+    json_schema: {
+      name: "schema_name",
+      strict: true,
+      schema: { /* JSON Schema definition */ }
+    }
+  }
+});
+```
+
+### Structured Outputs
+Use OpenAI's Structured Outputs feature for type-safe, validated JSON responses:
+- Set `response_format.type` to `"json_schema"`
+- Provide a complete JSON Schema with `strict: true`
+- Include `additionalProperties: false` in the schema
+- Parse the response with `JSON.parse(completion.choices[0].message.content)`
+
+### Error Handling
+Always implement proper error handling for AI operations:
+- Check for missing API keys before making requests
+- Validate response content exists before parsing
+- Provide user-friendly error messages
+- Log errors for debugging but avoid exposing sensitive details to users
+
+### Troubleshooting
+- **"AI service unavailable"**: Check that `OPENAI_API_KEY` is set in your environment
+- **Local development**: Ensure `.env.local` exists with a valid API key
+- **Production errors**: Verify the secret is set via `wrangler secret list`
+- **Type errors**: The OpenAI SDK is fully typed; use TypeScript's inference
+
 ## Security & Configuration Tips
 Keep API keys in Wrangler secrets or Cloudflare dashboard; never commit `.env` files. When adding bindings, update `cloudflare-env.d.ts` and `wrangler.jsonc` so type generation stays accurate. Revisit `middleware.ts` whenever authentication or routing rules change.

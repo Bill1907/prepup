@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Upload } from "lucide-react";
 import { getDrizzleDB } from "@/lib/db";
@@ -37,7 +43,7 @@ function formatRelativeTime(dateString: string): string {
  */
 function parseAIFeedback(aiFeedback: string | null): string {
   if (!aiFeedback) return "";
-  
+
   try {
     const parsed = JSON.parse(aiFeedback);
     if (typeof parsed === "string") {
@@ -77,10 +83,7 @@ export default async function ResumePage() {
     .select()
     .from(resumesTable)
     .where(
-      and(
-        eq(resumesTable.clerkUserId, userId),
-        eq(resumesTable.isActive, 1)
-      )
+      and(eq(resumesTable.clerkUserId, userId), eq(resumesTable.isActive, 1))
     )
     .orderBy(desc(resumesTable.createdAt));
 
@@ -88,12 +91,13 @@ export default async function ResumePage() {
   const totalResumes = userResumes.length;
   const resumesWithScore = userResumes.filter((r) => r.score !== null);
   const reviewsCompleted = resumesWithScore.length;
-  const avgScore = reviewsCompleted > 0
-    ? Math.round(
-        resumesWithScore.reduce((sum, r) => sum + (r.score || 0), 0) /
-          reviewsCompleted
-      )
-    : 0;
+  const avgScore =
+    reviewsCompleted > 0
+      ? Math.round(
+          resumesWithScore.reduce((sum, r) => sum + (r.score || 0), 0) /
+            reviewsCompleted
+        )
+      : 0;
 
   // DB 데이터를 UI에 맞게 변환
   const resumes = userResumes.map((resume) => ({
@@ -112,7 +116,9 @@ export default async function ResumePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Resume Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Resume Management
+            </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               Upload, edit, and optimize your resumes with AI-powered feedback
             </p>
@@ -129,7 +135,9 @@ export default async function ResumePage() {
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Resumes</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Total Resumes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalResumes}</div>
@@ -137,7 +145,9 @@ export default async function ResumePage() {
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Avg. Score</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Avg. Score
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{avgScore}%</div>
@@ -145,7 +155,9 @@ export default async function ResumePage() {
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Reviews Completed</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Reviews Completed
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{reviewsCompleted}</div>
@@ -153,7 +165,9 @@ export default async function ResumePage() {
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Templates Used</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Templates Used
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">0</div>
@@ -172,7 +186,8 @@ export default async function ResumePage() {
                 No resumes yet
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
-                Get started by uploading your first resume. We'll help you optimize it with AI-powered feedback.
+                Get started by uploading your first resume. We'll help you
+                optimize it with AI-powered feedback.
               </p>
               <Button asChild>
                 <Link href="/service/resume/upload">
@@ -194,27 +209,41 @@ export default async function ResumePage() {
         <Card className="mt-8">
           <CardHeader>
             <CardTitle>Resume Templates</CardTitle>
-            <CardDescription>Start with a professional template</CardDescription>
+            <CardDescription>
+              Start with a professional template
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-4 gap-4">
-              {["Modern", "Classic", "Creative", "Executive"].map((template) => (
-                <Card key={template} className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg flex items-center justify-center">
-                      <FileText className="h-12 w-12 text-gray-600" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <h3 className="font-semibold mb-2">{template}</h3>
-                    <Button variant="outline" size="sm" className="w-full" asChild>
-                      <Link href={`/service/resume/template/${template.toLowerCase()}`}>
-                        Use Template
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+              {["Modern", "Classic", "Creative", "Executive"].map(
+                (template) => (
+                  <Card
+                    key={template}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <CardHeader>
+                      <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg flex items-center justify-center">
+                        <FileText className="h-12 w-12 text-gray-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <h3 className="font-semibold mb-2">{template}</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        asChild
+                      >
+                        <Link
+                          href={`/service/resume/template/${template.toLowerCase()}`}
+                        >
+                          Use Template
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
+              )}
             </div>
           </CardContent>
         </Card>
@@ -222,4 +251,3 @@ export default async function ResumePage() {
     </div>
   );
 }
-
