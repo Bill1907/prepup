@@ -6,6 +6,8 @@ import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -79,11 +81,43 @@ interface AnalyzeResult {
 }
 
 /**
- * AI 이력서 분석 (JSON Mode 사용)
+ * PDF URL을 다운로드해서 OpenAI Files API에 업로드하고 fileId를 반환
+ */
+async function uploadPdfFromUrl(pdfUrl: string): Promise<string> {
+  // 1) PDF 다운로드
+  const res = await fetch(pdfUrl);
+  if (!res.ok) {
+    throw new Error(`PDF 다운로드 실패: ${res.status} ${res.statusText}`);
+  }
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // 2) 임시 파일로 저장
+  const tmpFilePath = path.join(process.cwd(), `temp_pdf_${Date.now()}.pdf`);
+  await fs.promises.writeFile(tmpFilePath, buffer);
+
+  try {
+    // 3) OpenAI Files API에 업로드
+    const file = await openai.files.create({
+      file: fs.createReadStream(tmpFilePath),
+      purpose: "assistants",
+    });
+
+    return file.id;
+  } finally {
+    // 4) 임시 파일 정리
+    await fs.promises.unlink(tmpFilePath).catch(() => {
+      // 무시
+    });
+  }
+}
+
+/**
+ * AI 이력서 분석 (Files API + Assistants 사용)
  */
 export async function analyzeResume(
   resumeId: string,
-  extractedText: string
+  presignedUrl: string
 ): Promise<AnalyzeResult> {
   try {
     const { userId } = await auth();
@@ -103,83 +137,97 @@ export async function analyzeResume(
     if (!resume) return { success: false, error: "Resume not found" };
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini",
+      // 1) PDF를 업로드하고 file_id 가져오기
+      console.log("[ANALYZE] Uploading PDF from URL:", presignedUrl);
+      const fileId = await uploadPdfFromUrl(presignedUrl);
+      console.log("[ANALYZE] File uploaded, ID:", fileId);
+
+      // 2) Assistant 생성
+      const assistant = await openai.beta.assistants.create({
+        name: "Resume Analyzer",
+        instructions:
+          "You are an expert resume analyzer and career coach. Analyze resumes and provide structured feedback in JSON format.",
+        model: "gpt-4o",
+        tools: [{ type: "file_search" }],
+      });
+
+      // 3) Thread 생성 및 파일 첨부
+      const thread = await openai.beta.threads.create({
         messages: [
           {
-            role: "system",
-            content:
-              "You are an expert resume analyzer and career coach. Analyze resumes and provide structured feedback.",
-          },
-          {
             role: "user",
-            content: `Analyze the following resume and provide detailed feedback:
+            content: `Analyze this resume PDF and provide detailed feedback in the following JSON format:
 
-Resume Content:
-"""
-${extractedText.substring(0, 12000)}
-"""
+{
+  "summary": "A 2-3 sentence professional summary of the candidate",
+  "score": <number from 0-100 based on completeness, impact, and clarity>,
+  "strengths": ["strength 1", "strength 2", ...],
+  "improvements": ["improvement 1", "improvement 2", ...]
+}
 
 Provide:
 1. A professional summary (2-3 sentences)
 2. A score from 0-100 based on completeness, impact, and clarity
 3. Key strengths (2-5 bullet points)
-4. Areas for improvement (2-5 bullet points)`,
+4. Areas for improvement (2-5 bullet points)
+
+Return ONLY valid JSON, nothing else.`,
+            attachments: [
+              {
+                file_id: fileId,
+                tools: [{ type: "file_search" }],
+              },
+            ],
           },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "resume_analysis",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                summary: {
-                  type: "string",
-                  description:
-                    "A 2-3 sentence professional summary of the candidate",
-                },
-                score: {
-                  type: "number",
-                  description:
-                    "A score from 0-100 based on completeness, impact, and clarity",
-                },
-                strengths: {
-                  type: "array",
-                  description: "List of key strengths found in the resume",
-                  items: {
-                    type: "string",
-                  },
-                },
-                improvements: {
-                  type: "array",
-                  description: "List of areas that need improvement",
-                  items: {
-                    type: "string",
-                  },
-                },
-              },
-              required: ["summary", "score", "strengths", "improvements"],
-              additionalProperties: false,
-            },
-          },
-        },
       });
 
-      // Parse the structured response
-      const responseContent = completion.choices[0]?.message?.content;
-      if (!responseContent) {
-        throw new Error("No response from AI");
+      // 4) Run 실행 및 완료 대기
+      const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+        assistant_id: assistant.id,
+      });
+
+      if (run.status !== "completed") {
+        throw new Error(`Run failed with status: ${run.status}`);
       }
 
-      const analysisData: ResumeAnalysisData = JSON.parse(responseContent);
+      // 5) 응답 가져오기
+      const messages = await openai.beta.threads.messages.list(thread.id);
+      const lastMessage = messages.data[0];
+
+      if (!lastMessage || lastMessage.role !== "assistant") {
+        throw new Error("No assistant response found");
+      }
+
+      // 6) 텍스트 추출
+      const textContent = lastMessage.content.find((c) => c.type === "text");
+      if (!textContent || textContent.type !== "text") {
+        throw new Error("No text content in response");
+      }
+
+      let responseText = textContent.text.value;
+
+      // JSON만 추출 (markdown 코드 블록 제거)
+      responseText = responseText
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
+      console.log("[ANALYZE] Raw response:", responseText);
+
+      const analysisData: ResumeAnalysisData = JSON.parse(responseText);
+
+      // 7) 정리 (파일 및 Assistant 삭제)
+      await openai.files.delete(fileId).catch(console.error);
+      await openai.beta.assistants.delete(assistant.id).catch(console.error);
 
       revalidatePath(`/service/resume/${resumeId}`);
       return { success: true, analysis: analysisData };
     } catch (error) {
       console.error("Server Action Error:", error);
-      return { success: false, error: "Internal server error" };
+      const errorMessage =
+        error instanceof Error ? error.message : "Internal server error";
+      return { success: false, error: errorMessage };
     }
   } catch (error) {
     console.error("Analyze Resume Error:", error);
