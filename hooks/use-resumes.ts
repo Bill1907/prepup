@@ -271,9 +271,13 @@ export function useUploadResume() {
         file.name.replace(/\.[^/.]+$/, "") ||
         "Untitled Resume";
 
+      // Generate UUID for resume_id (required by schema)
+      const resumeId = crypto.randomUUID();
+
       const data = await graphqlClient.request<CreateResumeResponse>(
         CREATE_RESUME,
         {
+          resumeId,
           userId,
           title: resumeTitle,
           fileUrl: fileKey,

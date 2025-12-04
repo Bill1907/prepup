@@ -129,12 +129,14 @@ export const SOFT_DELETE_RESUME = gql`
 
 export const CREATE_RESUME = gql`
   mutation CreateResume(
+    $resumeId: String!
     $userId: String!
     $title: String!
     $fileUrl: String
   ) {
     insert_resumes_one(
       object: {
+        resume_id: $resumeId
         clerk_user_id: $userId
         title: $title
         file_url: $fileUrl
