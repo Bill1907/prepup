@@ -1,0 +1,25 @@
+version: '3.6'
+services:
+  hasura:
+    image: hasura/graphql-engine:v2.44.0
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    environment:
+      # Neon PostgreSQL 연결 (production 브랜치)
+      HASURA_GRAPHQL_DATABASE_URL: ${NEON_DATABASE_URL}
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: ${NEON_DATABASE_URL}
+
+      # Hasura 설정
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:-hasura-dev-secret}
+
+      # CORS 설정 (Next.js 연동용)
+      HASURA_GRAPHQL_CORS_DOMAIN: "http://localhost:3000,http://localhost:8080"
+
+      # 권한 설정
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: "anonymous"
+
+      # 로깅
+      HASURA_GRAPHQL_LOG_LEVEL: "info"

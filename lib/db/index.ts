@@ -4,6 +4,11 @@
  */
 export { getDrizzleDB, getR2Bucket } from "./core";
 
+// Presigned URL 생성을 위한 필수 imports
+import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { AwsClient } from "aws4fetch";
+
 /**
  * 사용자가 존재하는지 확인하고, 없으면 생성하는 헬퍼 함수
  * Clerk webhook이 실패하거나 지연되어도 안전하게 동작하도록 합니다.
@@ -70,6 +75,24 @@ export async function getFile(fileKey: string): Promise<R2Object | null> {
 }
 
 /**
+ * R2에서 파일 데이터를 직접 가져오기 (ArrayBuffer로 반환)
+ * OpenAI API 등에 업로드하기 위한 용도
+ * @param fileKey R2에 저장된 파일 키
+ * @returns ArrayBuffer 또는 null (파일이 없는 경우)
+ */
+export async function getFileData(fileKey: string): Promise<ArrayBuffer | null> {
+  const { getR2Bucket } = await import("./core");
+  const r2Bucket = getR2Bucket();
+  const file = await r2Bucket.get(fileKey);
+
+  if (!file) {
+    return null;
+  }
+
+  return await file.arrayBuffer();
+}
+
+/**
  * R2에 파일 업로드
  * @param fileKey R2에 저장할 파일 키
  * @param data 파일 데이터 (ArrayBuffer 또는 Uint8Array)
@@ -107,16 +130,14 @@ export async function getPresignedUrl(
   fileKey: string,
   expiresIn: number = 3600
 ): Promise<string> {
-  const { getRequestContext } = await import("@cloudflare/next-on-pages");
-
   // R2 API 토큰 확인
   let accessKeyId: string | undefined;
   let secretAccessKey: string | undefined;
   let accountId: string | undefined;
 
   try {
-    // Cloudflare Workers 환경
-    const { env } = getRequestContext();
+    // Edge runtime 및 로컬 개발 환경에서는 getCloudflareContext 사용
+    const { env } = getCloudflareContext();
     const typedEnv = env as CloudflareEnv & {
       R2_ACCESS_KEY_ID?: string;
       R2_SECRET_ACCESS_KEY?: string;
@@ -125,11 +146,28 @@ export async function getPresignedUrl(
     accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
     secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
     accountId = typedEnv.R2_ACCOUNT_ID;
-  } catch {
-    // 로컬 개발 환경
-    accessKeyId = process.env.R2_ACCESS_KEY_ID;
-    secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-    accountId = process.env.R2_ACCOUNT_ID;
+  } catch (error) {
+    // Cloudflare Workers 환경 (프로덕션)에서는 getRequestContext 사용
+    try {
+      const { env } = getRequestContext();
+      const typedEnv = env as CloudflareEnv & {
+        R2_ACCESS_KEY_ID?: string;
+        R2_SECRET_ACCESS_KEY?: string;
+        R2_ACCOUNT_ID?: string;
+      };
+      accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
+      secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
+      accountId = typedEnv.R2_ACCOUNT_ID;
+    } catch (fallbackError) {
+      console.error(
+        "[getPresignedUrl] Both context methods failed:",
+        error,
+        fallbackError
+      );
+      throw new Error(
+        "Unable to access Cloudflare environment. Please check your configuration."
+      );
+    }
   }
 
   if (!accessKeyId || !secretAccessKey || !accountId) {
@@ -147,8 +185,7 @@ export async function getPresignedUrl(
   // Presigned URL 만료 시간 설정
   url.searchParams.set("X-Amz-Expires", expiresIn.toString());
 
-  // AWS 클라이언트 생성 및 서명
-  const { AwsClient } = await import("aws4fetch");
+  // AWS 클라이언트 생성 및 서명 (정적 import 사용)
   const client = new AwsClient({
     accessKeyId,
     secretAccessKey,
@@ -176,3 +213,8 @@ export * from "./schema";
  * Resume 도메인
  */
 export * from "./resume";
+
+/**
+ * Questions 도메인
+ */
+export * from "./questions";

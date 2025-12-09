@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
+import { useAuth } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -9,11 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload } from "lucide-react";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes as resumesTable } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Upload, AlertCircle, RefreshCw } from "lucide-react";
 import { ResumeCard } from "./components/resume-card";
+import { useResumes, useResumeStats } from "@/hooks/use-resumes";
 
 /**
  * 날짜를 상대 시간 문자열로 변환 (예: "2 hours ago", "1 day ago")
@@ -69,46 +70,130 @@ function getStatusFromScore(score: number | null): "Reviewed" | "Draft" {
   return score !== null ? "Reviewed" : "Draft";
 }
 
-export default async function ResumePage() {
-  const { userId } = await auth();
+/**
+ * Stats Loading Skeleton
+ */
+function StatsLoadingSkeleton() {
+  return (
+    <div className="grid md:grid-cols-4 gap-4 mb-8">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-16" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
-  if (!userId) {
+/**
+ * Resume List Loading Skeleton
+ */
+function ResumeListLoadingSkeleton() {
+  return (
+    <div className="grid gap-6">
+      {[...Array(3)].map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Error State Component
+ */
+function ErrorState({
+  message,
+  onRetry
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <Card className="py-12">
+      <CardContent className="flex flex-col items-center justify-center text-center">
+        <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+          <AlertCircle className="h-12 w-12 text-red-500" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          Something went wrong
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
+          {message}
+        </p>
+        {onRetry && (
+          <Button onClick={onRetry} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try Again
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ResumePage() {
+  const { userId, isLoaded: isAuthLoaded } = useAuth();
+
+  // Redirect if not authenticated (after auth is loaded)
+  if (isAuthLoaded && !userId) {
     redirect("/auth/sign-in");
   }
 
-  const db = getDrizzleDB();
+  // Fetch resumes using GraphQL + TanStack Query
+  const {
+    data: resumesData,
+    isLoading: isResumesLoading,
+    error: resumesError,
+    refetch: refetchResumes,
+  } = useResumes();
 
-  // 사용자의 활성 이력서 목록 조회
-  const userResumes = await db
-    .select()
-    .from(resumesTable)
-    .where(
-      and(eq(resumesTable.clerkUserId, userId), eq(resumesTable.isActive, 1))
-    )
-    .orderBy(desc(resumesTable.createdAt));
+  // Fetch stats using GraphQL + TanStack Query
+  const {
+    data: stats,
+    isLoading: isStatsLoading,
+  } = useResumeStats();
 
-  // 통계 계산
-  const totalResumes = userResumes.length;
-  const resumesWithScore = userResumes.filter((r) => r.score !== null);
-  const reviewsCompleted = resumesWithScore.length;
-  const avgScore =
-    reviewsCompleted > 0
-      ? Math.round(
-          resumesWithScore.reduce((sum, r) => sum + (r.score || 0), 0) /
-            reviewsCompleted
-        )
-      : 0;
-
-  // DB 데이터를 UI에 맞게 변환
-  const resumes = userResumes.map((resume) => ({
-    id: resume.resumeId,
+  // Transform resume data for UI
+  const resumes = (resumesData || []).map((resume) => ({
+    id: resume.resume_id,
     name: resume.title,
     status: getStatusFromScore(resume.score),
     score: resume.score ?? 0,
-    lastUpdated: formatRelativeTime(resume.updatedAt),
+    lastUpdated: formatRelativeTime(resume.updated_at),
     version: resume.version,
-    feedback: parseAIFeedback(resume.aiFeedback),
+    feedback: parseAIFeedback(resume.ai_feedback),
   }));
+
+  // Show loading state while auth is loading
+  if (!isAuthLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -132,51 +217,62 @@ export default async function ResumePage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Total Resumes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalResumes}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Avg. Score
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{avgScore}%</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Reviews Completed
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reviewsCompleted}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Templates Used
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-            </CardContent>
-          </Card>
-        </div>
+        {isStatsLoading ? (
+          <StatsLoadingSkeleton />
+        ) : (
+          <div className="grid md:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Total Resumes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Avg. Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.avgScore ?? 0}%</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Reviews Completed
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.reviewed ?? 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Templates Used
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">0</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Resumes List */}
-        {resumes.length === 0 ? (
+        {isResumesLoading ? (
+          <ResumeListLoadingSkeleton />
+        ) : resumesError ? (
+          <ErrorState
+            message="Failed to load resumes. Please try again."
+            onRetry={() => refetchResumes()}
+          />
+        ) : resumes.length === 0 ? (
           <Card className="py-12">
             <CardContent className="flex flex-col items-center justify-center text-center">
               <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">

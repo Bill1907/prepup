@@ -6,8 +6,6 @@ import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -82,6 +80,7 @@ interface AnalyzeResult {
 
 /**
  * PDF URL을 다운로드해서 OpenAI Files API에 업로드하고 fileId를 반환
+ * Cloudflare Workers 환경에서 동작하도록 메모리 기반 처리 사용
  */
 async function uploadPdfFromUrl(pdfUrl: string): Promise<string> {
   // 1) PDF 다운로드
@@ -90,26 +89,20 @@ async function uploadPdfFromUrl(pdfUrl: string): Promise<string> {
     throw new Error(`PDF 다운로드 실패: ${res.status} ${res.statusText}`);
   }
   const arrayBuffer = await res.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
 
-  // 2) 임시 파일로 저장
-  const tmpFilePath = path.join(process.cwd(), `temp_pdf_${Date.now()}.pdf`);
-  await fs.promises.writeFile(tmpFilePath, buffer);
+  // 2) File 객체 생성 (메모리에서 직접 - fs 모듈 불필요)
+  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+  const file = new File([blob], `resume_${Date.now()}.pdf`, {
+    type: "application/pdf",
+  });
 
-  try {
-    // 3) OpenAI Files API에 업로드
-    const file = await openai.files.create({
-      file: fs.createReadStream(tmpFilePath),
-      purpose: "assistants",
-    });
+  // 3) OpenAI Files API에 업로드
+  const uploadedFile = await openai.files.create({
+    file: file,
+    purpose: "assistants",
+  });
 
-    return file.id;
-  } finally {
-    // 4) 임시 파일 정리
-    await fs.promises.unlink(tmpFilePath).catch(() => {
-      // 무시
-    });
-  }
+  return uploadedFile.id;
 }
 
 /**

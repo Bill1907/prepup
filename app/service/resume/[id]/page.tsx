@@ -1,5 +1,7 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect, notFound } from "next/navigation";
+"use client";
+
+import { useAuth } from "@clerk/nextjs";
+import { redirect, notFound, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   Card,
@@ -10,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Accordion,
   AccordionContent,
@@ -18,7 +21,6 @@ import {
 } from "@/components/ui/accordion";
 import {
   FileText,
-  Download,
   Star,
   ArrowLeft,
   History,
@@ -26,12 +28,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  RefreshCw,
 } from "lucide-react";
-import { getResumeById, getResumeHistoryWithAI, resumeHistory } from "@/lib/db";
+import { useResume, useResumeHistory } from "@/hooks/use-resumes";
 import { ResumeActions } from "./components/resume-actions";
 import { PdfViewerWrapper } from "./components/pdf-viewer-wrapper";
 import { AnalyzeButton } from "./components/analyze-button";
 import { FilePreviewNonPdf } from "./components/file-preview-non-pdf";
+import type { ResumeHistoryItem } from "@/lib/graphql";
 
 /**
  * 날짜 포맷팅
@@ -171,34 +175,166 @@ function AIFeedbackDisplay({ feedback }: { feedback: AIFeedbackData | null }) {
   );
 }
 
-interface PageProps {
-  params: Promise<{
-    id: string;
-  }>;
+/**
+ * Loading Skeleton for Resume Detail
+ */
+function ResumeDetailSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Skeleton */}
+        <div className="mb-6">
+          <Skeleton className="h-10 w-32 mb-4" />
+          <div className="flex items-start justify-between">
+            <div>
+              <Skeleton className="h-9 w-64 mb-2" />
+              <Skeleton className="h-5 w-96" />
+            </div>
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left Column Skeleton */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column Skeleton */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-[600px] w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default async function ResumeDetailPage({ params }: PageProps) {
-  const { userId } = await auth();
+/**
+ * Error State Component
+ */
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Button variant="ghost" asChild className="mb-4">
+          <Link href="/service/resume">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Resumes
+          </Link>
+        </Button>
+        <Card className="py-12">
+          <CardContent className="flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+              <AlertCircle className="h-12 w-12 text-red-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Something went wrong
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
+              {message}
+            </p>
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
-  if (!userId) {
+export default function ResumeDetailPage() {
+  const params = useParams();
+  const resumeId = params.id as string;
+  const { userId, isLoaded: isAuthLoaded } = useAuth();
+
+  // Redirect if not authenticated (after auth is loaded)
+  if (isAuthLoaded && !userId) {
     redirect("/auth/sign-in");
   }
 
-  const { id } = await params;
-  const resumeId = id;
+  // Fetch resume data using GraphQL + TanStack Query
+  const {
+    data: resume,
+    isLoading: isResumeLoading,
+    error: resumeError,
+    refetch: refetchResume,
+  } = useResume(resumeId);
 
-  // 이력서 조회 (본인의 이력서만, 권한 검증 포함)
-  const resume = await getResumeById(resumeId, userId);
+  // Fetch AI history using GraphQL + TanStack Query
+  const {
+    data: aiHistory,
+    isLoading: isHistoryLoading,
+  } = useResumeHistory(resumeId);
 
+  // Show loading state while auth is loading or data is fetching
+  if (!isAuthLoaded || isResumeLoading) {
+    return <ResumeDetailSkeleton />;
+  }
+
+  // Handle error state
+  if (resumeError) {
+    return (
+      <ErrorState
+        message="Failed to load resume details. Please try again."
+        onRetry={() => refetchResume()}
+      />
+    );
+  }
+
+  // Handle not found
   if (!resume) {
     notFound();
   }
 
-  // AI 리뷰 히스토리 조회
-  const aiHistory = await getResumeHistoryWithAI(resumeId, userId);
+  // Check authorization - only show if user owns the resume and it's active
+  if (resume.clerk_user_id !== userId || !resume.is_active) {
+    notFound();
+  }
 
-  const isPdf = resume.fileUrl?.toLowerCase().endsWith(".pdf") || false;
-  const currentFeedback = parseAIFeedback(resume.aiFeedback);
+  const isPdf = resume.file_url?.toLowerCase().endsWith(".pdf") || false;
+  const currentFeedback = parseAIFeedback(resume.ai_feedback);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -218,8 +354,8 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Version {resume.version} • Created{" "}
-                {formatDate(resume.createdAt)} • Updated{" "}
-                {formatDate(resume.updatedAt)}
+                {formatDate(resume.created_at)} • Updated{" "}
+                {formatDate(resume.updated_at)}
               </p>
             </div>
             <div className="flex gap-2">
@@ -284,7 +420,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                 <div className="pt-2">
                   <AnalyzeButton
                     resumeId={resumeId}
-                    fileUrl={resume.fileUrl}
+                    fileUrl={resume.file_url}
                     isPdf={isPdf}
                   />
                 </div>
@@ -307,7 +443,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
             )}
 
             {/* Historical AI Reviews */}
-            {aiHistory.length > 0 && (
+            {!isHistoryLoading && aiHistory && aiHistory.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Review History</CardTitle>
@@ -319,16 +455,13 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                 <CardContent>
                   <Accordion type="single" collapsible className="w-full">
                     {aiHistory.map(
-                      (
-                        historyItem: typeof resumeHistory.$inferSelect,
-                        index: number
-                      ) => {
+                      (historyItem: ResumeHistoryItem, index: number) => {
                         const historyFeedback = parseAIFeedback(
-                          historyItem.aiFeedback
+                          historyItem.ai_feedback
                         );
                         return (
                           <AccordionItem
-                            key={historyItem.historyId}
+                            key={historyItem.history_id}
                             value={`item-${index}`}
                           >
                             <AccordionTrigger className="hover:no-underline">
@@ -340,7 +473,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
                                       Version {historyItem.version}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {formatDate(historyItem.createdAt)}
+                                      {formatDate(historyItem.created_at)}
                                     </div>
                                   </div>
                                 </div>
@@ -373,7 +506,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               <CardContent>
                 <ResumeActions
                   resumeId={resumeId}
-                  hasFile={!!resume.fileUrl}
+                  hasFile={!!resume.file_url}
                   isPdf={isPdf}
                 />
               </CardContent>
@@ -400,21 +533,21 @@ export default async function ResumeDetailPage({ params }: PageProps) {
               <CardHeader>
                 <CardTitle>Resume Preview</CardTitle>
                 <CardDescription>
-                  {resume.fileUrl
-                    ? `File: ${resume.fileUrl.split("/").pop()}`
+                  {resume.file_url
+                    ? `File: ${resume.file_url.split("/").pop()}`
                     : "No file uploaded"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {resume.fileUrl ? (
+                {resume.file_url ? (
                   <div className="w-full">
                     {isPdf ? (
                       <PdfViewerWrapper
-                        fileUrl={resume.fileUrl}
+                        fileUrl={resume.file_url}
                         resumeId={resumeId}
                       />
                     ) : (
-                      <FilePreviewNonPdf fileUrl={resume.fileUrl} />
+                      <FilePreviewNonPdf fileUrl={resume.file_url} />
                     )}
                   </div>
                 ) : (

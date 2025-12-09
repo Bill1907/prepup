@@ -89,6 +89,26 @@ export const GET_RESUME_HISTORY = gql`
 
 // ============ Mutations ============
 
+export const ENSURE_USER_EXISTS = gql`
+  mutation EnsureUserExists($userId: String!, $email: String) {
+    insert_users_one(
+      object: {
+        clerk_user_id: $userId
+        email: $email
+        language_preference: "en"
+      }
+      on_conflict: {
+        constraint: users_pkey
+        update_columns: []
+      }
+    ) {
+      clerk_user_id
+      email
+      language_preference
+    }
+  }
+`;
+
 export const UPDATE_RESUME = gql`
   mutation UpdateResume(
     $resumeId: String!

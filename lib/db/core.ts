@@ -73,6 +73,9 @@ export function getR2Bucket(): R2Bucket {
     const { env } = getRequestContext();
     const typedEnv = env as CloudflareEnv;
 
+    console.log("[getR2Bucket] Available env bindings:", Object.keys(env || {}));
+    console.log("[getR2Bucket] prepup_files binding exists:", !!typedEnv.prepup_files);
+
     if (!typedEnv.prepup_files) {
       throw new Error(
         'R2 bucket binding "prepup_files" is not configured. Please check wrangler.jsonc.'
@@ -81,10 +84,15 @@ export function getR2Bucket(): R2Bucket {
 
     return typedEnv.prepup_files;
   } catch (error) {
+    console.error("[getR2Bucket] Error in getRequestContext:", error);
+    
     // 로컬 개발 환경에서는 @opennextjs/cloudflare 사용
     try {
       const { env } = getCloudflareContext();
       const typedEnv = env as CloudflareEnv;
+
+      console.log("[getR2Bucket] Fallback - Available env bindings:", Object.keys(env || {}));
+      console.log("[getR2Bucket] Fallback - prepup_files binding exists:", !!typedEnv.prepup_files);
 
       if (!typedEnv.prepup_files) {
         throw new Error(
@@ -94,6 +102,8 @@ export function getR2Bucket(): R2Bucket {
 
       return typedEnv.prepup_files;
     } catch (fallbackError) {
+      console.error("[getR2Bucket] Error in getCloudflareContext:", fallbackError);
+      
       // 두 방법 모두 실패한 경우
       if (error instanceof Error && error.message.includes("prepup_files")) {
         throw error;
@@ -107,7 +117,9 @@ export function getR2Bucket(): R2Bucket {
 
       throw new Error(
         "R2 bucket is not available in this environment. " +
-          "Make sure wrangler.jsonc is properly configured with prepup_files binding."
+          "Make sure wrangler.jsonc is properly configured with prepup_files binding. " +
+          `Original error: ${error instanceof Error ? error.message : String(error)}. ` +
+          `Fallback error: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`
       );
     }
   }

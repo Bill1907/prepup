@@ -1,6 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { AwsClient } from "aws4fetch";
 import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+
+export const runtime = "edge";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = [
@@ -17,24 +20,24 @@ function sanitizeFilename(filename: string): string {
   const lastDotIndex = filename.lastIndexOf(".");
   let name = filename;
   let extension = "";
-  
+
   if (lastDotIndex > 0) {
     name = filename.substring(0, lastDotIndex);
     extension = filename.substring(lastDotIndex);
   }
-  
+
   // 파일명 sanitize (영문자, 숫자, 하이픈, 언더스코어만 허용)
   const sanitizedName = name
     .replace(/[^a-zA-Z0-9-_]/g, "_")
     .replace(/_{2,}/g, "_")
     .replace(/^_|_$/g, "");
-  
+
   // 파일명이 비어있으면 기본값 사용
   const finalName = sanitizedName || "resume";
-  
+
   // 확장자가 없으면 .pdf 추가
   const finalExtension = extension || ".pdf";
-  
+
   return `${finalName}${finalExtension}`;
 }
 
@@ -112,8 +115,8 @@ export async function POST(request: Request) {
     let secretAccessKey: string | undefined;
     let accountId: string | undefined;
 
+    // 1. Cloudflare Workers 환경 (프로덕션) - getRequestContext 시도
     try {
-      // Cloudflare Workers 환경에서 시도
       const { env } = getRequestContext();
       const typedEnv = env as CloudflareEnv & {
         R2_ACCESS_KEY_ID?: string;
@@ -123,18 +126,100 @@ export async function POST(request: Request) {
       accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
       secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
       accountId = typedEnv.R2_ACCOUNT_ID;
-    } catch {
-      // 로컬 개발 환경에서는 process.env 사용
+
+      if (accessKeyId && secretAccessKey && accountId) {
+        console.log("[Presigned URL] Using credentials from getRequestContext");
+      }
+    } catch (error) {
+      console.log(
+        "[Presigned URL] getRequestContext failed, trying getCloudflareContext"
+      );
+    }
+
+    // 2. 로컬 개발 환경 - getCloudflareContext 시도
+    if (!accessKeyId || !secretAccessKey || !accountId) {
+      try {
+        const { env } = getCloudflareContext();
+        const typedEnv = env as CloudflareEnv & {
+          R2_ACCESS_KEY_ID?: string;
+          R2_SECRET_ACCESS_KEY?: string;
+          R2_ACCOUNT_ID?: string;
+        };
+        accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
+        secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
+        accountId = typedEnv.R2_ACCOUNT_ID;
+
+        if (accessKeyId && secretAccessKey && accountId) {
+          console.log(
+            "[Presigned URL] Using credentials from getCloudflareContext"
+          );
+        }
+      } catch (fallbackError) {
+        console.log(
+          "[Presigned URL] getCloudflareContext failed, trying process.env"
+        );
+      }
+    }
+
+    // 3. Fallback: process.env에서 직접 읽기 (로컬 개발 환경 - .env.local 지원)
+    if (!accessKeyId || !secretAccessKey || !accountId) {
+      // Next.js는 .env.local의 환경 변수를 process.env에 자동으로 로드합니다
       accessKeyId = process.env.R2_ACCESS_KEY_ID;
       secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
       accountId = process.env.R2_ACCOUNT_ID;
+
+      if (accessKeyId && secretAccessKey && accountId) {
+        console.log(
+          "[Presigned URL] Using credentials from process.env (.env.local)"
+        );
+      } else {
+        // 디버깅: process.env에 어떤 값들이 있는지 확인
+        console.log("[Presigned URL] process.env check:", {
+          hasR2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+          hasR2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+          hasR2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+          // 보안을 위해 값은 로그하지 않음
+        });
+      }
     }
 
+    // 환경 변수 검증 및 디버깅 정보
     if (!accessKeyId || !secretAccessKey || !accountId) {
+      const missingVars: string[] = [];
+      if (!accessKeyId) missingVars.push("R2_ACCESS_KEY_ID");
+      if (!secretAccessKey) missingVars.push("R2_SECRET_ACCESS_KEY");
+      if (!accountId) missingVars.push("R2_ACCOUNT_ID");
+
+      console.error("[Presigned URL] Missing R2 credentials:", missingVars);
+      console.error(
+        "[Presigned URL] Please set these in either:",
+        "\n  1. .dev.vars file (Cloudflare Workers standard)",
+        "\n  2. .env.local file (Next.js standard - will be loaded to process.env)",
+        "\n  3. Wrangler secrets (production)"
+      );
+
       return Response.json(
         {
           error:
-            "R2 credentials not configured. Please set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_ACCOUNT_ID as Wrangler secrets.",
+            `R2 credentials not configured. Missing: ${missingVars.join(", ")}. ` +
+            "Please set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_ACCOUNT_ID in .env.local or .dev.vars (local) or as Wrangler secrets (production).",
+        },
+        { status: 500 }
+      );
+    }
+
+    // Account ID 검증 (placeholder 값 체크)
+    if (
+      accountId.includes("your_cloudflare_account_id") ||
+      accountId.includes("YOUR_ACCOUNT_ID")
+    ) {
+      console.error(
+        "[Presigned URL] Invalid R2_ACCOUNT_ID: placeholder value detected"
+      );
+      return Response.json(
+        {
+          error:
+            "R2_ACCOUNT_ID is set to a placeholder value. Please set your actual Cloudflare Account ID from the dashboard.",
         },
         { status: 500 }
       );
@@ -147,9 +232,16 @@ export async function POST(request: Request) {
 
     // R2 S3 호환 엔드포인트 URL 생성
     const bucketName = "prepup-files";
-    const url = new URL(
-      `https://${bucketName}.${accountId}.r2.cloudflarestorage.com/${fileKey}`
-    );
+    const r2Url = `https://${bucketName}.${accountId}.r2.cloudflarestorage.com/${fileKey}`;
+
+    console.log("[Presigned URL] Generating presigned URL:", {
+      bucketName,
+      accountId: accountId.substring(0, 8) + "...", // 보안을 위해 일부만 로그
+      fileKey,
+      url: r2Url.substring(0, 50) + "...", // 보안을 위해 일부만 로그
+    });
+
+    const url = new URL(r2Url);
 
     // Presigned URL 만료 시간 설정 (1시간)
     url.searchParams.set("X-Amz-Expires", "3600");
@@ -179,6 +271,21 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Error generating presigned URL:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    console.error(
+      "Error stack:",
+      error instanceof Error ? error.stack : "No stack trace"
+    );
+    console.error("Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : "Unknown error",
+    });
+
+    return Response.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
   }
 }

@@ -13,7 +13,10 @@ export const subscriptionTierEnum = ["free", "premium", "pro"] as const;
 export const questionCategoryEnum = [
   "behavioral",
   "technical",
-  "situational",
+  "system_design",
+  "leadership",
+  "problem_solving",
+  "company_specific",
 ] as const;
 export const difficultyEnum = ["easy", "medium", "hard"] as const;
 export const sessionStatusEnum = [

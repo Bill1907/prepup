@@ -11,6 +11,7 @@ import {
   SOFT_DELETE_RESUME,
   UPDATE_RESUME,
   CREATE_RESUME,
+  ENSURE_USER_EXISTS,
   type GetResumesResponse,
   type GetResumeByIdResponse,
   type GetResumeStatsResponse,
@@ -18,6 +19,7 @@ import {
   type CreateResumeResponse,
   type Resume,
 } from "@/lib/graphql";
+import { useUser } from "@clerk/nextjs";
 
 // Query Keys
 export const resumeKeys = {
@@ -219,6 +221,7 @@ export function useResumeHistory(resumeId: string) {
 export function useUploadResume() {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
+  const { user } = useUser();
 
   return useMutation({
     mutationFn: async ({ file, title }: { file: File; title?: string }) => {
@@ -265,7 +268,20 @@ export function useUploadResume() {
         throw new Error("Failed to upload file to R2");
       }
 
-      // 3. 업로드 완료 후 메타데이터 저장 (GraphQL)
+      // 3. Ensure user exists in GraphQL database before creating resume
+      // This prevents foreign key violations if Clerk webhook hasn't run yet
+      const userEmail = user?.emailAddresses?.[0]?.emailAddress || null;
+      try {
+        await graphqlClient.request(ENSURE_USER_EXISTS, {
+          userId,
+          email: userEmail,
+        });
+      } catch (error) {
+        // Ignore errors if user already exists (on_conflict handles it)
+        console.warn("User sync warning:", error);
+      }
+
+      // 4. 업로드 완료 후 메타데이터 저장 (GraphQL)
       const resumeTitle =
         title?.trim() ||
         file.name.replace(/\.[^/.]+$/, "") ||

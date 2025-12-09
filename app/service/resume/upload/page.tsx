@@ -24,6 +24,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useUploadResume } from "@/hooks/use-resumes";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = [
@@ -50,131 +51,57 @@ const uploadSchema = z.object({
 
 type UploadFormValues = z.infer<typeof uploadSchema>;
 
-type UploadStatus = "idle" | "uploading" | "success" | "error";
-
 export default function UploadResumePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // TanStack Query Mutation 사용
+  const uploadMutation = useUploadResume();
 
   const form = useForm({
     defaultValues: {
       file: undefined as File | undefined,
       title: "",
     },
+
     onSubmit: async ({ value }) => {
-      try {
-        setUploadStatus("uploading");
-        setUploadError(null);
-
-        // Zod 스키마로 최종 검증
-        const validation = uploadSchema.safeParse(value);
-        if (!validation.success) {
-          const error =
-            validation.error.issues[0]?.message || "Validation failed";
-          setUploadStatus("error");
-          setUploadError(error);
-          return;
-        }
-
-        if (!value.file) {
-          throw new Error("Please select a file");
-        }
-
-        // 1. Presigned URL 요청
-        const presignedResponse = await fetch(
-          "/api/resumes/upload/presigned-url",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              filename: value.file.name,
-              contentType: value.file.type,
-              fileSize: value.file.size,
-            }),
-          }
-        );
-
-        if (!presignedResponse.ok) {
-          const errorData = (await presignedResponse.json()) as {
-            error?: string;
-          };
-          throw new Error(errorData.error || "Failed to generate upload URL");
-        }
-
-        const { presignedUrl, fileKey } = (await presignedResponse.json()) as {
-          presignedUrl: string;
-          fileKey: string;
-        };
-
-        // 2. Presigned URL로 직접 파일 업로드
-        const uploadResponse = await fetch(presignedUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": value.file.type,
-          },
-          body: value.file,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error("Failed to upload file to R2");
-        }
-
-        // 3. 업로드 완료 후 메타데이터 저장
-        const completeResponse = await fetch("/api/resumes/upload/complete", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fileKey,
-            title: value.title?.trim(),
-            originalFilename: value.file.name,
-          }),
-        });
-
-        if (!completeResponse.ok) {
-          const errorData = (await completeResponse.json()) as {
-            error?: string;
-          };
-          throw new Error(errorData.error || "Failed to save metadata");
-        }
-
-        setUploadStatus("success");
-
-        // 성공 후 1초 뒤 리다이렉트
-        setTimeout(() => {
-          router.push("/service/resume");
-        }, 1000);
-      } catch (error) {
-        setUploadStatus("error");
-        setUploadError(
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred"
-        );
+      // Zod 스키마로 최종 검증
+      const validation = uploadSchema.safeParse(value);
+      if (!validation.success) {
+        const error =
+          validation.error.issues[0]?.message || "Validation failed";
+        return;
       }
+
+      if (!value.file) {
+        return;
+      }
+
+      // TanStack Query Mutation 실행
+      uploadMutation.mutate(
+        {
+          file: value.file,
+          title: value.title?.trim(),
+        },
+        {
+          onSuccess: () => {
+            // 성공 후 1초 뒤 리다이렉트
+            setTimeout(() => {
+              router.push("/service/resume");
+            }, 1000);
+          },
+        }
+      );
     },
   });
 
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
 
-    // 파일 검증
-    const validation = uploadSchema.shape.file.safeParse(file);
-    if (!validation.success) {
-      const error = validation.error.issues[0]?.message || "Invalid file";
-      setUploadError(error);
-      return;
-    }
-
+    // 파일을 form에 설정 (form.Field의 validator가 자동으로 검증)
     setSelectedFile(file);
-    setUploadError(null);
     form.setFieldValue("file", file);
 
     // 파일명을 제목으로 자동 설정 (사용자가 입력하지 않은 경우)
@@ -268,7 +195,14 @@ export default function UploadResumePage() {
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={(e) => {
+                        // 버튼이 아닌 영역을 클릭한 경우에만 파일 선택 다이얼로그 열기
+                        if (
+                          (e.target as HTMLElement).closest("button") === null
+                        ) {
+                          fileInputRef.current?.click();
+                        }
+                      }}
                       className={`
                         border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer
                         ${
@@ -302,7 +236,14 @@ export default function UploadResumePage() {
                       <p className="text-sm text-gray-500 mb-4">
                         PDF, DOCX, or DOC up to 5MB
                       </p>
-                      <Button type="button" variant="outline">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fileInputRef.current?.click();
+                        }}
+                      >
                         Choose File
                       </Button>
                     </div>
@@ -371,7 +312,7 @@ export default function UploadResumePage() {
               </form.Field>
 
               {/* 업로드 상태 표시 */}
-              {uploadStatus === "uploading" && (
+              {uploadMutation.isPending && (
                 <div className="mt-6 space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
@@ -382,7 +323,7 @@ export default function UploadResumePage() {
                 </div>
               )}
 
-              {uploadStatus === "success" && (
+              {uploadMutation.isSuccess && (
                 <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <p className="text-sm text-green-800 dark:text-green-200">
@@ -391,11 +332,13 @@ export default function UploadResumePage() {
                 </div>
               )}
 
-              {uploadStatus === "error" && uploadError && (
+              {uploadMutation.isError && uploadMutation.error && (
                 <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-red-600" />
                   <p className="text-sm text-red-800 dark:text-red-200">
-                    {uploadError}
+                    {uploadMutation.error instanceof Error
+                      ? uploadMutation.error.message
+                      : "An unexpected error occurred"}
                   </p>
                 </div>
               )}
@@ -404,11 +347,9 @@ export default function UploadResumePage() {
               <div className="mt-6 flex justify-end">
                 <Button
                   type="submit"
-                  disabled={uploadStatus === "uploading" || !selectedFile}
+                  disabled={uploadMutation.isPending || !selectedFile}
                 >
-                  {uploadStatus === "uploading"
-                    ? "Uploading..."
-                    : "Upload Resume"}
+                  {uploadMutation.isPending ? "Uploading..." : "Upload Resume"}
                 </Button>
               </div>
             </form>

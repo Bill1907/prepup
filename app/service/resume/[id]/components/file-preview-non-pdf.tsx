@@ -35,13 +35,22 @@ export function FilePreviewNonPdf({ fileUrl }: FilePreviewNonPdfProps) {
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
+          interface ErrorResponse {
+            error?: string;
+          }
+          const errorData = (await response
+            .json()
+            .catch(() => ({}))) as ErrorResponse;
           throw new Error(
-            errorData.error || `Failed to get presigned URL: ${response.statusText}`
+            errorData.error ||
+              `Failed to get presigned URL: ${response.statusText}`
           );
         }
 
-        const data = await response.json();
+        interface SuccessResponse {
+          presignedUrl: string;
+        }
+        const data = (await response.json()) as SuccessResponse;
         setPresignedUrl(data.presignedUrl);
       } catch (err) {
         console.error("[File Preview] Failed to get presigned URL:", err);
@@ -103,4 +112,3 @@ export function FilePreviewNonPdf({ fileUrl }: FilePreviewNonPdfProps) {
     </div>
   );
 }
-
