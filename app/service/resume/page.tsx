@@ -121,7 +121,7 @@ function ResumeListLoadingSkeleton() {
  */
 function ErrorState({
   message,
-  onRetry
+  onRetry,
 }: {
   message: string;
   onRetry?: () => void;
@@ -166,10 +166,7 @@ export default function ResumePage() {
   } = useResumes();
 
   // Fetch stats using GraphQL + TanStack Query
-  const {
-    data: stats,
-    isLoading: isStatsLoading,
-  } = useResumeStats();
+  const { data: stats, isLoading: isStatsLoading } = useResumeStats();
 
   // Transform resume data for UI
   const resumes = (resumesData || []).map((resume) => ({
@@ -185,165 +182,157 @@ export default function ResumePage() {
   // Show loading state while auth is loading
   if (!isAuthLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Resume Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Upload, edit, and optimize your resumes with AI-powered feedback
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/service/resume/upload">
-              <Upload className="mr-2 h-4 w-4" />
-              Upload New Resume
-            </Link>
-          </Button>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Resume Management
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Upload, edit, and optimize your resumes with AI-powered feedback
+          </p>
         </div>
+        <Button asChild>
+          <Link href="/service/resume/upload">
+            <Upload className="mr-2 h-4 w-4" />
+            Upload New Resume
+          </Link>
+        </Button>
+      </div>
 
-        {/* Quick Stats */}
-        {isStatsLoading ? (
-          <StatsLoadingSkeleton />
-        ) : (
-          <div className="grid md:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Total Resumes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Avg. Score
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.avgScore ?? 0}%</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Reviews Completed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.reviewed ?? 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Templates Used
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Resumes List */}
-        {isResumesLoading ? (
-          <ResumeListLoadingSkeleton />
-        ) : resumesError ? (
-          <ErrorState
-            message="Failed to load resumes. Please try again."
-            onRetry={() => refetchResumes()}
-          />
-        ) : resumes.length === 0 ? (
-          <Card className="py-12">
-            <CardContent className="flex flex-col items-center justify-center text-center">
-              <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
-                <FileText className="h-12 w-12 text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                No resumes yet
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
-                Get started by uploading your first resume. We'll help you
-                optimize it with AI-powered feedback.
-              </p>
-              <Button asChild>
-                <Link href="/service/resume/upload">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Your First Resume
-                </Link>
-              </Button>
+      {/* Quick Stats */}
+      {isStatsLoading ? (
+        <StatsLoadingSkeleton />
+      ) : (
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Total Resumes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-6">
-            {resumes.map((resume) => (
-              <ResumeCard key={resume.id} resume={resume} />
-            ))}
-          </div>
-        )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Avg. Score
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.avgScore ?? 0}%</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Reviews Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.reviewed ?? 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Templates Used
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {/* Templates Section */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Resume Templates</CardTitle>
-            <CardDescription>
-              Start with a professional template
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-4 gap-4">
-              {["Modern", "Classic", "Creative", "Executive"].map(
-                (template) => (
-                  <Card
-                    key={template}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <CardHeader>
-                      <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg flex items-center justify-center">
-                        <FileText className="h-12 w-12 text-gray-600" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <h3 className="font-semibold mb-2">{template}</h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        asChild
-                      >
-                        <Link
-                          href={`/service/resume/template/${template.toLowerCase()}`}
-                        >
-                          Use Template
-                        </Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )
-              )}
+      {/* Resumes List */}
+      {isResumesLoading ? (
+        <ResumeListLoadingSkeleton />
+      ) : resumesError ? (
+        <ErrorState
+          message="Failed to load resumes. Please try again."
+          onRetry={() => refetchResumes()}
+        />
+      ) : resumes.length === 0 ? (
+        <Card className="py-12">
+          <CardContent className="flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+              <FileText className="h-12 w-12 text-gray-400" />
             </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No resumes yet
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
+              Get started by uploading your first resume. We'll help you
+              optimize it with AI-powered feedback.
+            </p>
+            <Button asChild>
+              <Link href="/service/resume/upload">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Your First Resume
+              </Link>
+            </Button>
           </CardContent>
         </Card>
-      </div>
+      ) : (
+        <div className="grid gap-6">
+          {resumes.map((resume) => (
+            <ResumeCard key={resume.id} resume={resume} />
+          ))}
+        </div>
+      )}
+
+      {/* Templates Section */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Resume Templates</CardTitle>
+          <CardDescription>Start with a professional template</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-4 gap-4">
+            {["Modern", "Classic", "Creative", "Executive"].map((template) => (
+              <Card
+                key={template}
+                className="hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <CardHeader>
+                  <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg flex items-center justify-center">
+                    <FileText className="h-12 w-12 text-gray-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <h3 className="font-semibold mb-2">{template}</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    asChild
+                  >
+                    <Link
+                      href={`/service/resume/template/${template.toLowerCase()}`}
+                    >
+                      Use Template
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

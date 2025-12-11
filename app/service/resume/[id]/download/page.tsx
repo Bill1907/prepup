@@ -20,7 +20,7 @@ export default function DownloadResumePage({ params }: PageProps) {
 
       try {
         const response = await fetch(`/api/resumes/${resumeId}/download`);
-        
+
         if (!response.ok) {
           throw new Error("Failed to download resume");
         }
@@ -30,7 +30,7 @@ export default function DownloadResumePage({ params }: PageProps) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        
+
         // Content-Disposition 헤더에서 파일명 추출
         const contentDisposition = response.headers.get("Content-Disposition");
         let filename = "resume.pdf";
@@ -40,7 +40,7 @@ export default function DownloadResumePage({ params }: PageProps) {
             filename = filenameMatch[1];
           }
         }
-        
+
         a.download = filename;
         document.body.appendChild(a);
         a.click();
@@ -59,7 +59,7 @@ export default function DownloadResumePage({ params }: PageProps) {
   }, [params, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+    <div className="flex items-center justify-center min-h-[50vh]">
       <div className="text-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
         <p className="text-gray-600 dark:text-gray-400">
@@ -69,4 +69,3 @@ export default function DownloadResumePage({ params }: PageProps) {
     </div>
   );
 }
-
