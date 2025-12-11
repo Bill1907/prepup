@@ -46,8 +46,6 @@ export function QuestionGenerateForm({ resumes }: QuestionGenerateFormProps) {
     setSuccess(null);
 
     try {
-      console.log("[QUESTIONS] Starting question generation for resume:", selectedResumeId);
-
       // Call server action - server will fetch PDF directly from R2
       const result = await generateQuestionsFromResume(selectedResumeId);
 
@@ -130,10 +128,11 @@ export function QuestionGenerateForm({ resumes }: QuestionGenerateFormProps) {
 
       {success && (
         <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-          <p className="text-sm text-green-700 dark:text-green-400">{success}</p>
+          <p className="text-sm text-green-700 dark:text-green-400">
+            {success}
+          </p>
         </div>
       )}
     </div>
   );
 }
-

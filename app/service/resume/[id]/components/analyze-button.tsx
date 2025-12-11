@@ -41,24 +41,13 @@ export function AnalyzeButton({
       return;
     }
 
-    console.log("[ANALYZE] Starting analysis:", {
-      resumeId,
-      fileUrl,
-      isPdf,
-    });
-
     setIsAnalyzing(true);
     setError(null);
 
     try {
       // Call server action directly with fileKey (R2 key)
       // Server action will fetch the file directly from R2, avoiding permission issues
-      console.log("[ANALYZE] Calling analyzeResume server action:", {
-        resumeId,
-        fileKey: fileUrl,
-      });
       const result = await analyzeResume(resumeId, fileUrl);
-      console.log("[ANALYZE] Analysis result:", result);
 
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
@@ -84,9 +73,6 @@ export function AnalyzeButton({
           queryClient.invalidateQueries({
             queryKey: resumeKeys.history(resumeId),
           });
-          console.log(
-            "[ANALYZE] Queries invalidated, data will refresh automatically"
-          );
         }
       } else {
         setError(result.error || "Failed to analyze resume");

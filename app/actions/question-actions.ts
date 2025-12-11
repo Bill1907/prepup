@@ -85,15 +85,8 @@ export async function generateQuestionsFromResume(
     if (!resume.fileUrl) return { success: false, error: "Resume has no file" };
 
     try {
-      console.log(
-        "[QUESTIONS] Fetching PDF from R2, fileKey:",
-        resume.fileUrl
-      );
-
       // R2에서 직접 PDF 가져와서 OpenAI에 업로드
-      console.log("[QUESTIONS] Uploading PDF to OpenAI...");
       const fileId = await uploadPdfFromR2(resume.fileUrl);
-      console.log("[QUESTIONS] File uploaded, ID:", fileId);
 
       // 3) Assistant 생성
       const assistant = await openai.beta.assistants.create({
@@ -184,8 +177,6 @@ Return ONLY valid JSON array, nothing else.`,
         .replace(/```\n?/g, "")
         .trim();
 
-      console.log("[QUESTIONS] Raw response length:", responseText.length);
-
       const generatedQuestions: GeneratedQuestion[] = JSON.parse(responseText);
 
       // 8) DB에 질문 저장
@@ -203,7 +194,6 @@ Return ONLY valid JSON array, nothing else.`,
       );
 
       const count = await createQuestions(questionsToInsert);
-      console.log("[QUESTIONS] Created questions:", count);
 
       // 9) 정리 (파일 및 Assistant 삭제)
       await openai.files.delete(fileId).catch(console.error);

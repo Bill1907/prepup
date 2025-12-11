@@ -37,21 +37,19 @@ export async function POST(request: Request) {
     }
 
     // 중요: R2에 파일이 실제로 업로드되었는지 검증
-    console.log(`[UPLOAD] Verifying file exists in R2: ${body.fileKey}`);
     const fileObject = await getFile(body.fileKey);
-    
+
     if (!fileObject) {
       console.error(`[UPLOAD] File not found in R2: ${body.fileKey}`);
       return Response.json(
-        { 
-          error: "File upload failed. The file was not found in storage. Please try again.",
-          fileKey: body.fileKey
+        {
+          error:
+            "File upload failed. The file was not found in storage. Please try again.",
+          fileKey: body.fileKey,
         },
         { status: 400 }
       );
     }
-    
-    console.log(`[UPLOAD] File verified in R2: ${body.fileKey}, size: ${fileObject.size} bytes`);
 
     const db = getDrizzleDB();
 

@@ -24,13 +24,6 @@ if (typeof window !== "undefined") {
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url
   ).toString();
-
-  console.log(
-    "[PDF Viewer] pdfjs version:",
-    pdfjs.version,
-    "workerSrc:",
-    pdfjs.GlobalWorkerOptions.workerSrc
-  );
 }
 
 interface PdfViewerProps {

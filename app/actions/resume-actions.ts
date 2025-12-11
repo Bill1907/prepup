@@ -86,10 +86,8 @@ interface AnalyzeResult {
  */
 async function uploadPdfFromR2(fileKey: string): Promise<string> {
   // 1) Presigned URL 생성 후 파일 다운로드
-  console.log("[ANALYZE] Generating presigned URL for:", fileKey);
   const presignedUrl = await getPresignedUrl(fileKey, 300); // 5분 만료
 
-  console.log("[ANALYZE] Downloading file from R2 via presigned URL...");
   const response = await fetch(presignedUrl);
 
   if (!response.ok) {
@@ -99,10 +97,6 @@ async function uploadPdfFromR2(fileKey: string): Promise<string> {
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  console.log(
-    "[ANALYZE] File downloaded from R2, size:",
-    arrayBuffer.byteLength
-  );
 
   // 2) File 객체 생성 (메모리에서 직접 - fs 모듈 불필요)
   const blob = new Blob([arrayBuffer], { type: "application/pdf" });
@@ -111,13 +105,11 @@ async function uploadPdfFromR2(fileKey: string): Promise<string> {
   });
 
   // 3) OpenAI Files API에 업로드
-  console.log("[ANALYZE] Uploading to OpenAI Files API...");
   const uploadedFile = await openai.files.create({
     file: fileToUpload,
     purpose: "assistants",
   });
 
-  console.log("[ANALYZE] File uploaded to OpenAI, ID:", uploadedFile.id);
   return uploadedFile.id;
 }
 
@@ -138,8 +130,6 @@ export async function analyzeResume(
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    console.log("[ANALYZE] Starting analysis:", { resumeId, userId, fileKey });
-
     // 보안: 파일 키가 해당 사용자의 것인지 확인
     // 파일 키 형식: "resumes/{userId}/{timestamp}-filename.pdf"
     const expectedPrefix = `resumes/${userId}/`;
@@ -157,8 +147,6 @@ export async function analyzeResume(
         error: "Unauthorized: You can only analyze your own files",
       };
     }
-
-    console.log("[ANALYZE] File key validated, proceeding with analysis");
 
     try {
       // 1) R2에서 PDF를 직접 가져와서 OpenAI에 업로드하고 file_id 가져오기
@@ -235,8 +223,6 @@ Return ONLY valid JSON, nothing else.`,
         .replace(/```\n?/g, "")
         .trim();
 
-      console.log("[ANALYZE] Raw response:", responseText);
-
       const analysisData: ResumeAnalysisData = JSON.parse(responseText);
 
       // 7) GraphQL을 통해 분석 결과 저장 (Hasura)
@@ -247,10 +233,6 @@ Return ONLY valid JSON, nothing else.`,
           aiFeedback: analysisData,
           score: analysisData.score,
         });
-        console.log(
-          "[ANALYZE] Analysis saved via GraphQL for resume:",
-          resumeId
-        );
       } catch (error) {
         const errorMessage =
           error instanceof Error

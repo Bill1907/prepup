@@ -126,14 +126,8 @@ export async function POST(request: Request) {
       accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
       secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
       accountId = typedEnv.R2_ACCOUNT_ID;
-
-      if (accessKeyId && secretAccessKey && accountId) {
-        console.log("[Presigned URL] Using credentials from getRequestContext");
-      }
     } catch (error) {
-      console.log(
-        "[Presigned URL] getRequestContext failed, trying getCloudflareContext"
-      );
+      // Fallback to getCloudflareContext
     }
 
     // 2. 로컬 개발 환경 - getCloudflareContext 시도
@@ -148,16 +142,8 @@ export async function POST(request: Request) {
         accessKeyId = typedEnv.R2_ACCESS_KEY_ID;
         secretAccessKey = typedEnv.R2_SECRET_ACCESS_KEY;
         accountId = typedEnv.R2_ACCOUNT_ID;
-
-        if (accessKeyId && secretAccessKey && accountId) {
-          console.log(
-            "[Presigned URL] Using credentials from getCloudflareContext"
-          );
-        }
       } catch (fallbackError) {
-        console.log(
-          "[Presigned URL] getCloudflareContext failed, trying process.env"
-        );
+        // Fallback to process.env
       }
     }
 
@@ -167,20 +153,6 @@ export async function POST(request: Request) {
       accessKeyId = process.env.R2_ACCESS_KEY_ID;
       secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
       accountId = process.env.R2_ACCOUNT_ID;
-
-      if (accessKeyId && secretAccessKey && accountId) {
-        console.log(
-          "[Presigned URL] Using credentials from process.env (.env.local)"
-        );
-      } else {
-        // 디버깅: process.env에 어떤 값들이 있는지 확인
-        console.log("[Presigned URL] process.env check:", {
-          hasR2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
-          hasR2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
-          hasR2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
-          // 보안을 위해 값은 로그하지 않음
-        });
-      }
     }
 
     // 환경 변수 검증 및 디버깅 정보
@@ -233,13 +205,6 @@ export async function POST(request: Request) {
     // R2 S3 호환 엔드포인트 URL 생성
     const bucketName = "prepup-files";
     const r2Url = `https://${bucketName}.${accountId}.r2.cloudflarestorage.com/${fileKey}`;
-
-    console.log("[Presigned URL] Generating presigned URL:", {
-      bucketName,
-      accountId: accountId.substring(0, 8) + "...", // 보안을 위해 일부만 로그
-      fileKey,
-      url: r2Url.substring(0, 50) + "...", // 보안을 위해 일부만 로그
-    });
 
     const url = new URL(r2Url);
 

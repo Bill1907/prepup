@@ -70,7 +70,6 @@ export async function POST(req: Request) {
         languagePreference: "en",
       });
 
-      console.log("User created in D1:", id);
       return new Response("User created successfully", { status: 200 });
     }
 
@@ -80,7 +79,6 @@ export async function POST(req: Request) {
 
       // updated_at은 트리거에 의해 자동으로 업데이트됩니다
       // language_preference만 업데이트가 필요한 경우 여기서 처리할 수 있습니다
-      console.log("User updated in Clerk:", id);
       return new Response("User updated successfully", { status: 200 });
     }
 
@@ -96,12 +94,10 @@ export async function POST(req: Request) {
       // CASCADE로 자동 삭제되지만 명시적으로 처리
       await db.delete(users).where(eq(users.clerkUserId, id));
 
-      console.log("User deleted from D1:", id);
       return new Response("User deleted successfully", { status: 200 });
     }
 
     // 처리되지 않은 이벤트 타입
-    console.log("Unhandled event type:", eventType);
     return new Response(`Event type ${eventType} not handled`, { status: 200 });
   } catch (error) {
     console.error("Error processing webhook:", error);
