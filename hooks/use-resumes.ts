@@ -10,6 +10,7 @@ import {
   GET_RESUME_HISTORY,
   SOFT_DELETE_RESUME,
   UPDATE_RESUME,
+  UPDATE_RESUME_ANALYSIS,
   CREATE_RESUME,
   ENSURE_USER_EXISTS,
   type GetResumesResponse,
@@ -165,10 +166,10 @@ export function useUpdateResumeAnalysis() {
       score,
     }: {
       resumeId: string;
-      aiFeedback: string;
+      aiFeedback: Record<string, unknown>;
       score: number;
     }) => {
-      await graphqlClient.request(UPDATE_RESUME, {
+      await graphqlClient.request(UPDATE_RESUME_ANALYSIS, {
         resumeId,
         aiFeedback,
         score,

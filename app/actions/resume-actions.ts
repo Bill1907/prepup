@@ -6,7 +6,7 @@ import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
-import { graphqlClient, UPDATE_RESUME } from "@/lib/graphql";
+import { graphqlClient, UPDATE_RESUME_ANALYSIS } from "@/lib/graphql";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -242,9 +242,9 @@ Return ONLY valid JSON, nothing else.`,
       // 7) GraphQL을 통해 분석 결과 저장 (Hasura)
       let saveError: string | undefined;
       try {
-        await graphqlClient.request(UPDATE_RESUME, {
+        await graphqlClient.request(UPDATE_RESUME_ANALYSIS, {
           resumeId,
-          aiFeedback: JSON.stringify(analysisData),
+          aiFeedback: analysisData,
           score: analysisData.score,
         });
         console.log(

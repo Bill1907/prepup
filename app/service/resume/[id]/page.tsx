@@ -63,10 +63,46 @@ interface AIFeedbackData {
 
 /**
  * AI Feedback 파싱
+ * jsonb 타입으로 저장되어 GraphQL에서 객체로 반환되거나,
+ * 레거시 데이터의 경우 문자열로 반환될 수 있음
  */
-function parseAIFeedback(aiFeedback: string | null): AIFeedbackData | null {
+function parseAIFeedback(
+  aiFeedback: string | Record<string, unknown> | null
+): AIFeedbackData | null {
   if (!aiFeedback) return null;
 
+  // 이미 객체인 경우 (jsonb에서 직접 반환된 경우)
+  if (typeof aiFeedback === "object") {
+    const data = aiFeedback as Record<string, unknown>;
+
+    // 구조화된 데이터인 경우
+    if (
+      data.summary &&
+      Array.isArray(data.strengths) &&
+      Array.isArray(data.improvements)
+    ) {
+      return {
+        summary: data.summary as string,
+        score: (data.score as number) || 0,
+        strengths: data.strengths as string[],
+        improvements: data.improvements as string[],
+      };
+    }
+
+    // 레거시 포맷 처리
+    if (data.overall_feedback) {
+      return {
+        summary: data.overall_feedback as string,
+        score: (data.score as number) || 0,
+        strengths: (data.strengths as string[]) || [],
+        improvements: (data.improvements as string[]) || [],
+      };
+    }
+
+    return null;
+  }
+
+  // 문자열인 경우 (레거시 데이터)
   try {
     const parsed = JSON.parse(aiFeedback);
 

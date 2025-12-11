@@ -132,6 +132,25 @@ export const UPDATE_RESUME = gql`
   }
 `;
 
+export const UPDATE_RESUME_ANALYSIS = gql`
+  mutation UpdateResumeAnalysis(
+    $resumeId: String!
+    $aiFeedback: jsonb
+    $score: Int
+  ) {
+    update_resumes_by_pk(
+      pk_columns: { resume_id: $resumeId }
+      _set: { ai_feedback: $aiFeedback, score: $score }
+    ) {
+      resume_id
+      title
+      score
+      ai_feedback
+      updated_at
+    }
+  }
+`;
+
 export const SOFT_DELETE_RESUME = gql`
   mutation SoftDeleteResume($resumeId: String!) {
     update_resumes_by_pk(
@@ -181,7 +200,7 @@ export interface Resume {
   version: number;
   is_active: boolean;
   file_url: string | null;
-  ai_feedback: string | null;
+  ai_feedback: Record<string, unknown> | null;
   score: number | null;
   created_at: string;
   updated_at: string;
@@ -210,7 +229,7 @@ export interface ResumeHistoryItem {
   resume_id: string;
   clerk_user_id: string;
   version: number;
-  ai_feedback: string | null;
+  ai_feedback: Record<string, unknown> | null;
   score: number | null;
   created_at: string;
 }
