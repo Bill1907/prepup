@@ -31,31 +31,28 @@ export function AnalyzeButton({
     useState<ResumeAnalysisData | null>(null);
 
   const handleAnalyze = async () => {
-    if (!fileUrl) return;
+    if (!fileUrl) {
+      console.error("[ANALYZE] No fileUrl provided");
+      return;
+    }
+
+    console.log("[ANALYZE] Starting analysis:", {
+      resumeId,
+      fileUrl,
+      isPdf,
+    });
 
     setIsAnalyzing(true);
     setError(null);
 
     try {
-      // Get presigned URL from API
-      const response = await fetch("/api/files/presigned-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fileKey: fileUrl }),
+      // Call server action directly with fileKey (R2 key)
+      // Server action will fetch the file directly from R2, avoiding permission issues
+      console.log("[ANALYZE] Calling analyzeResume server action:", {
+        resumeId,
+        fileKey: fileUrl,
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get presigned URL: ${response.statusText}`);
-      }
-
-      const data = (await response.json()) as { presignedUrl: string };
-      const presignedUrl = data.presignedUrl;
-      console.log("[ANALYZE] Got presigned URL, sending to AI...");
-
-      // Call server action with presigned URL
-      const result = await analyzeResume(resumeId, presignedUrl);
+      const result = await analyzeResume(resumeId, fileUrl);
       console.log("[ANALYZE] Analysis result:", result);
 
       if (result.success && result.analysis) {

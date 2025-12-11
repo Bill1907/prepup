@@ -1,11 +1,12 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
+import { getDrizzleDB, getPresignedUrl } from "@/lib/db";
 import { resumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
+import { graphqlClient, UPDATE_RESUME } from "@/lib/graphql";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -79,61 +80,88 @@ interface AnalyzeResult {
 }
 
 /**
- * PDF URL을 다운로드해서 OpenAI Files API에 업로드하고 fileId를 반환
- * Cloudflare Workers 환경에서 동작하도록 메모리 기반 처리 사용
+ * R2에서 PDF 파일을 가져와서 OpenAI Files API에 업로드하고 fileId를 반환
+ * Presigned URL을 통해 프로덕션 R2에 접근 (로컬/프로덕션 환경 모두 지원)
  */
-async function uploadPdfFromUrl(pdfUrl: string): Promise<string> {
-  // 1) PDF 다운로드
-  const res = await fetch(pdfUrl);
-  if (!res.ok) {
-    throw new Error(`PDF 다운로드 실패: ${res.status} ${res.statusText}`);
+async function uploadPdfFromR2(fileKey: string): Promise<string> {
+  // 1) Presigned URL 생성 후 파일 다운로드
+  console.log("[ANALYZE] Generating presigned URL for:", fileKey);
+  const presignedUrl = await getPresignedUrl(fileKey, 300); // 5분 만료
+
+  console.log("[ANALYZE] Downloading file from R2 via presigned URL...");
+  const response = await fetch(presignedUrl);
+
+  if (!response.ok) {
+    throw new Error(
+      `R2에서 파일을 다운로드할 수 없습니다: ${response.status} ${response.statusText}`
+    );
   }
-  const arrayBuffer = await res.arrayBuffer();
+
+  const arrayBuffer = await response.arrayBuffer();
+  console.log(
+    "[ANALYZE] File downloaded from R2, size:",
+    arrayBuffer.byteLength
+  );
 
   // 2) File 객체 생성 (메모리에서 직접 - fs 모듈 불필요)
   const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-  const file = new File([blob], `resume_${Date.now()}.pdf`, {
+  const fileToUpload = new File([blob], `resume_${Date.now()}.pdf`, {
     type: "application/pdf",
   });
 
   // 3) OpenAI Files API에 업로드
+  console.log("[ANALYZE] Uploading to OpenAI Files API...");
   const uploadedFile = await openai.files.create({
-    file: file,
+    file: fileToUpload,
     purpose: "assistants",
   });
 
+  console.log("[ANALYZE] File uploaded to OpenAI, ID:", uploadedFile.id);
   return uploadedFile.id;
 }
 
 /**
  * AI 이력서 분석 (Files API + Assistants 사용)
+ * @param resumeId 이력서 ID
+ * @param fileKey R2에 저장된 파일 키 (예: "resumes/{userId}/{timestamp}-filename.pdf")
+ *
+ * 참고: 이력서 데이터는 GraphQL(Hasura)을 통해 관리되므로,
+ * 서버 액션에서는 파일 키 기반 검증만 수행합니다.
+ * 파일 키에 userId가 포함되어 있어 다른 사용자의 파일에 접근할 수 없습니다.
  */
 export async function analyzeResume(
   resumeId: string,
-  presignedUrl: string
+  fileKey: string
 ): Promise<AnalyzeResult> {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    const db = getDrizzleDB();
+    console.log("[ANALYZE] Starting analysis:", { resumeId, userId, fileKey });
 
-    // Verify ownership
-    const [resume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId))
-      )
-      .limit(1);
+    // 보안: 파일 키가 해당 사용자의 것인지 확인
+    // 파일 키 형식: "resumes/{userId}/{timestamp}-filename.pdf"
+    const expectedPrefix = `resumes/${userId}/`;
+    if (!fileKey.startsWith(expectedPrefix)) {
+      console.error(
+        "[ANALYZE] Invalid file key - unauthorized access attempt:",
+        {
+          fileKey,
+          userId,
+          expectedPrefix,
+        }
+      );
+      return {
+        success: false,
+        error: "Unauthorized: You can only analyze your own files",
+      };
+    }
 
-    if (!resume) return { success: false, error: "Resume not found" };
+    console.log("[ANALYZE] File key validated, proceeding with analysis");
 
     try {
-      // 1) PDF를 업로드하고 file_id 가져오기
-      console.log("[ANALYZE] Uploading PDF from URL:", presignedUrl);
-      const fileId = await uploadPdfFromUrl(presignedUrl);
-      console.log("[ANALYZE] File uploaded, ID:", fileId);
+      // 1) R2에서 PDF를 직접 가져와서 OpenAI에 업로드하고 file_id 가져오기
+      const fileId = await uploadPdfFromR2(fileKey);
 
       // 2) Assistant 생성
       const assistant = await openai.beta.assistants.create({
@@ -210,17 +238,21 @@ Return ONLY valid JSON, nothing else.`,
 
       const analysisData: ResumeAnalysisData = JSON.parse(responseText);
 
-      // 7) DB에 분석 결과 저장
-      await db
-        .update(resumes)
-        .set({
+      // 7) GraphQL을 통해 분석 결과 저장 (Hasura)
+      try {
+        await graphqlClient.request(UPDATE_RESUME, {
+          resumeId,
           aiFeedback: JSON.stringify(analysisData),
           score: analysisData.score,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(resumes.resumeId, resumeId));
-
-      console.log("[ANALYZE] Analysis saved to DB for resume:", resumeId);
+        });
+        console.log(
+          "[ANALYZE] Analysis saved via GraphQL for resume:",
+          resumeId
+        );
+      } catch (saveError) {
+        console.error("[ANALYZE] Failed to save analysis to DB:", saveError);
+        // 저장 실패해도 분석 결과는 반환
+      }
 
       // 8) 정리 (파일 및 Assistant 삭제)
       await openai.files.delete(fileId).catch(console.error);
