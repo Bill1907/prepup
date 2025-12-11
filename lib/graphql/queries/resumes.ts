@@ -23,7 +23,7 @@ export const GET_RESUMES = gql`
 `;
 
 export const GET_RESUME_BY_ID = gql`
-  query GetResumeById($resumeId: String!, $userId: String!) {
+  query GetResumeById($resumeId: String!) {
     resumes_by_pk(resume_id: $resumeId) {
       resume_id
       clerk_user_id
@@ -97,10 +97,7 @@ export const ENSURE_USER_EXISTS = gql`
         email: $email
         language_preference: "en"
       }
-      on_conflict: {
-        constraint: users_pkey
-        update_columns: []
-      }
+      on_conflict: { constraint: users_pkey, update_columns: [] }
     ) {
       clerk_user_id
       email

@@ -67,7 +67,7 @@ export function useResume(resumeId: string) {
 
       const data = await graphqlClient.request<GetResumeByIdResponse>(
         GET_RESUME_BY_ID,
-        { resumeId, userId }
+        { resumeId }
       );
       return data.resumes_by_pk;
     },
