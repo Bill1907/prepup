@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { analyzeResume } from "@/app/actions/resume-actions";
+import { resumeKeys } from "@/hooks/use-resumes";
 
 interface ResumeAnalysisData {
   summary: string;
@@ -25,6 +28,8 @@ export function AnalyzeButton({
   isPdf,
   disabled = false,
 }: AnalyzeButtonProps) {
+  const queryClient = useQueryClient();
+  const { userId } = useAuth();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] =
@@ -57,6 +62,32 @@ export function AnalyzeButton({
 
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
+
+        // 저장 에러가 있는 경우 사용자에게 알림
+        if (result.saveError) {
+          setError(
+            `Analysis completed but failed to save: ${result.saveError}. The results are shown below but may not persist.`
+          );
+        }
+
+        // 분석 결과가 저장되었으므로 관련 쿼리들을 무효화하여 자동 새로고침
+        if (userId) {
+          queryClient.invalidateQueries({
+            queryKey: resumeKeys.detail(resumeId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: resumeKeys.list(userId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: resumeKeys.stats(userId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: resumeKeys.history(resumeId),
+          });
+          console.log(
+            "[ANALYZE] Queries invalidated, data will refresh automatically"
+          );
+        }
       } else {
         setError(result.error || "Failed to analyze resume");
       }

@@ -77,6 +77,7 @@ interface AnalyzeResult {
   success: boolean;
   error?: string;
   analysis?: ResumeAnalysisData;
+  saveError?: string; // 저장 실패 시 에러 메시지
 }
 
 /**
@@ -239,6 +240,7 @@ Return ONLY valid JSON, nothing else.`,
       const analysisData: ResumeAnalysisData = JSON.parse(responseText);
 
       // 7) GraphQL을 통해 분석 결과 저장 (Hasura)
+      let saveError: string | undefined;
       try {
         await graphqlClient.request(UPDATE_RESUME, {
           resumeId,
@@ -249,9 +251,14 @@ Return ONLY valid JSON, nothing else.`,
           "[ANALYZE] Analysis saved via GraphQL for resume:",
           resumeId
         );
-      } catch (saveError) {
-        console.error("[ANALYZE] Failed to save analysis to DB:", saveError);
-        // 저장 실패해도 분석 결과는 반환
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to save analysis to database";
+        console.error("[ANALYZE] Failed to save analysis to DB:", error);
+        saveError = errorMessage;
+        // 저장 실패해도 분석 결과는 반환하되, 에러 정보도 함께 전달
       }
 
       // 8) 정리 (파일 및 Assistant 삭제)
@@ -259,7 +266,11 @@ Return ONLY valid JSON, nothing else.`,
       await openai.beta.assistants.delete(assistant.id).catch(console.error);
 
       revalidatePath(`/service/resume/${resumeId}`);
-      return { success: true, analysis: analysisData };
+      return {
+        success: true,
+        analysis: analysisData,
+        saveError, // 저장 실패 시 클라이언트에서 처리할 수 있도록 에러 전달
+      };
     } catch (error) {
       console.error("Server Action Error:", error);
       const errorMessage =
