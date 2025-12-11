@@ -41,10 +41,26 @@ function formatRelativeTime(dateString: string): string {
 
 /**
  * AI Feedback을 파싱하여 문자열로 반환
+ * GraphQL에서 jsonb 타입은 객체로 반환되므로 두 가지 케이스를 처리
  */
-function parseAIFeedback(aiFeedback: string | null): string {
+function parseAIFeedback(
+  aiFeedback: string | Record<string, unknown> | null
+): string {
   if (!aiFeedback) return "";
 
+  // 이미 객체인 경우 (jsonb에서 직접 반환된 경우)
+  if (typeof aiFeedback === "object") {
+    const data = aiFeedback as Record<string, unknown>;
+    if (data.summary) {
+      return data.summary as string;
+    }
+    if (data.overall_feedback) {
+      return data.overall_feedback as string;
+    }
+    return "";
+  }
+
+  // 문자열인 경우 (레거시 데이터)
   try {
     const parsed = JSON.parse(aiFeedback);
     if (typeof parsed === "string") {
@@ -56,7 +72,7 @@ function parseAIFeedback(aiFeedback: string | null): string {
     if (parsed.overall_feedback) {
       return parsed.overall_feedback;
     }
-    return JSON.stringify(parsed);
+    return "";
   } catch {
     // JSON 파싱 실패 시 원본 문자열 반환
     return aiFeedback;
