@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { getFile } from "@/lib/db";
+import { getFile, listFiles } from "@/lib/r2";
 
 export const runtime = "edge";
 
@@ -53,7 +53,6 @@ export async function GET(
 
       // 디버깅: 해당 사용자의 파일 목록 확인
       try {
-        const { listFiles } = await import("@/lib/db");
         const files = await listFiles(`resumes/${userId}/`, 10);
         console.error(
           `[DEBUG] Available files for user:`,

@@ -1,8 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
-import type { Resume, NewResume } from "@/types/database";
+import {
+  graphqlClient,
+  GET_RESUMES,
+  CREATE_RESUME,
+  type GetResumesResponse,
+  type CreateResumeResponse,
+} from "@/lib/graphql";
 
 /**
  * GET /api/resumes
@@ -13,32 +16,17 @@ export async function GET() {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDrizzleDB();
+    const data = await graphqlClient.request<GetResumesResponse>(GET_RESUMES, {
+      userId,
+    });
 
-    const userResumes = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(
-          eq(resumes.clerkUserId, userId),
-          eq(resumes.isActive, 1) // SQLite uses integer: 1 = true
-        )
-      )
-      .orderBy(desc(resumes.createdAt));
-
-    return Response.json({ resumes: userResumes });
+    return Response.json({ resumes: data.resumes });
   } catch (error) {
     console.error("Error fetching resumes:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -51,10 +39,7 @@ export async function POST(request: Request) {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = (await request.json()) as {
@@ -63,7 +48,11 @@ export async function POST(request: Request) {
     };
 
     // 요청 본문 검증
-    if (!body.title || typeof body.title !== "string" || body.title.trim().length === 0) {
+    if (
+      !body.title ||
+      typeof body.title !== "string" ||
+      body.title.trim().length === 0
+    ) {
       return Response.json(
         { error: "Title is required and must be a non-empty string" },
         { status: 400 }
@@ -77,34 +66,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const db = getDrizzleDB();
-
-    // 새 이력서 생성
     const resumeId = crypto.randomUUID();
-    const newResume: NewResume = {
-      resumeId,
-      clerkUserId: userId,
-      title: body.title.trim(),
-      content: body.content?.trim() || null,
-      version: 1,
-      isActive: 1, // SQLite uses integer for boolean: 1 = true
-    };
 
-    const [createdResume] = await db
-      .insert(resumes)
-      .values(newResume)
-      .returning();
+    const data = await graphqlClient.request<CreateResumeResponse>(
+      CREATE_RESUME,
+      {
+        resumeId,
+        userId,
+        title: body.title.trim(),
+        content: body.content?.trim() || null,
+        fileUrl: null,
+      }
+    );
 
     return Response.json(
-      { success: true, resume: createdResume },
+      { success: true, resume: data.insert_resumes_one },
       { status: 201 }
     );
   } catch (error) {
     console.error("Error creating resume:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

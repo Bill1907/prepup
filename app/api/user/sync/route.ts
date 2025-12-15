@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { ensureUserExists } from "@/lib/db";
+import { graphqlClient, ENSURE_USER_EXISTS } from "@/lib/graphql";
 
 /**
  * POST /api/user/sync
@@ -19,15 +19,14 @@ export async function POST() {
     const userEmail = user?.emailAddresses?.[0]?.emailAddress || null;
 
     // Ensure user exists (idempotent - safe to call multiple times)
-    await ensureUserExists(userId, userEmail);
+    await graphqlClient.request(ENSURE_USER_EXISTS, {
+      userId,
+      email: userEmail,
+    });
 
     return Response.json({ success: true, userId });
   } catch (error) {
     console.error("Error syncing user:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

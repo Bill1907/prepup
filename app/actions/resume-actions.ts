@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getPresignedUrl } from "@/lib/db";
+import { getPresignedUrl } from "@/lib/r2";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
 import {

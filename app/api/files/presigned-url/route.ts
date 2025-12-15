@@ -1,12 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
-import { getPresignedUrl } from "@/lib/db";
+import { getPresignedUrl } from "@/lib/r2";
 
 export const runtime = "edge";
 
 /**
  * POST /api/files/presigned-url
  * R2 파일 읽기용 Presigned URL 생성
- * lib/db의 getPresignedUrl 함수를 사용하여 일관성 유지
+ * lib/r2의 getPresignedUrl 함수를 사용하여 일관성 유지
  */
 export async function POST(request: Request) {
   try {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // lib/db의 getPresignedUrl 함수 사용
+    // lib/r2의 getPresignedUrl 함수 사용
     const expiresIn = body.expiresIn || 3600; // 기본 1시간
     const presignedUrl = await getPresignedUrl(body.fileKey, expiresIn);
 
