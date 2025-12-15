@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { listFiles } from "@/lib/db";
+import { listFiles } from "@/lib/r2";
 
 export const runtime = "edge";
 
@@ -12,10 +12,7 @@ export async function GET(request: Request) {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const url = new URL(request.url);
@@ -41,4 +38,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

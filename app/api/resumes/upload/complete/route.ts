@@ -1,7 +1,11 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getDrizzleDB, ensureUserExists, getFile } from "@/lib/db/index";
-import { resumes } from "@/lib/db/schema";
-import type { NewResume } from "@/types/database";
+import { getFile } from "@/lib/r2";
+import {
+  graphqlClient,
+  CREATE_RESUME,
+  ENSURE_USER_EXISTS,
+  type CreateResumeResponse,
+} from "@/lib/graphql";
 
 export const runtime = "edge";
 
@@ -51,41 +55,37 @@ export async function POST(request: Request) {
       );
     }
 
-    const db = getDrizzleDB();
-
     // 사용자가 존재하는지 확인하고, 없으면 생성
     // Clerk webhook이 실패하거나 지연되어도 안전하게 동작하도록 합니다
-    // Clerk에서 사용자 정보를 가져와 email 포함
     const user = await currentUser();
     const userEmail = user?.emailAddresses?.[0]?.emailAddress || null;
-    await ensureUserExists(userId, userEmail);
+    await graphqlClient.request(ENSURE_USER_EXISTS, {
+      userId,
+      email: userEmail,
+    });
 
-    // 새 이력서 생성
+    // GraphQL로 새 이력서 생성
     const resumeId = crypto.randomUUID();
     const resumeTitle =
       body.title?.trim() ||
       body.originalFilename?.replace(/\.[^/.]+$/, "") ||
       "Untitled Resume";
 
-    const newResume: NewResume = {
-      resumeId,
-      clerkUserId: userId,
-      title: resumeTitle,
-      content: null,
-      version: 1,
-      isActive: 1, // SQLite uses integer for boolean: 1 = true
-      fileUrl: body.fileKey,
-    };
-
-    const [createdResume] = await db
-      .insert(resumes)
-      .values(newResume)
-      .returning();
+    const data = await graphqlClient.request<CreateResumeResponse>(
+      CREATE_RESUME,
+      {
+        resumeId,
+        userId,
+        title: resumeTitle,
+        fileUrl: body.fileKey,
+        content: null,
+      }
+    );
 
     return Response.json(
       {
         success: true,
-        resume: createdResume,
+        resume: data.insert_resumes_one,
         fileUrl: body.fileKey,
       },
       { status: 201 }

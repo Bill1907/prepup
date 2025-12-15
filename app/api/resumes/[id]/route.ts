@@ -1,8 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes, resumeHistory } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import type { Resume, NewResumeHistory } from "@/types/database";
+import {
+  graphqlClient,
+  GET_RESUME_BY_ID,
+  UPDATE_RESUME_METADATA,
+  INSERT_RESUME_HISTORY,
+  SOFT_DELETE_RESUME,
+  type GetResumeByIdResponse,
+  type Resume,
+} from "@/lib/graphql";
 
 interface RouteParams {
   params: Promise<{
@@ -14,50 +19,31 @@ interface RouteParams {
  * GET /api/resumes/[id]
  * 특정 이력서 상세 정보 조회
  */
-export async function GET(
-  request: Request,
-  { params }: RouteParams
-) {
+export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDrizzleDB();
-    const { id } = await params;
-    const resumeId = id;
+    const { id: resumeId } = await params;
 
-    // 이력서 조회 (본인의 이력서만)
-    const [resume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(
-          eq(resumes.resumeId, resumeId),
-          eq(resumes.clerkUserId, userId)
-        )
-      )
-      .limit(1);
+    const data = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    if (!resume) {
-      return Response.json(
-        { error: "Resume not found" },
-        { status: 404 }
-      );
+    const resume = data.resumes_by_pk;
+
+    if (!resume || resume.clerk_user_id !== userId) {
+      return Response.json({ error: "Resume not found" }, { status: 404 });
     }
 
     return Response.json({ resume });
   } catch (error) {
     console.error("Error fetching resume:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -65,41 +51,26 @@ export async function GET(
  * PATCH /api/resumes/[id]
  * 이력서 메타데이터 수정
  */
-export async function PATCH(
-  request: Request,
-  { params }: RouteParams
-) {
+export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDrizzleDB();
-    const { id } = await params;
-    const resumeId = id;
+    const { id: resumeId } = await params;
 
     // 먼저 이력서가 존재하고 본인의 것인지 확인
-    const [existingResume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(
-          eq(resumes.resumeId, resumeId),
-          eq(resumes.clerkUserId, userId)
-        )
-      )
-      .limit(1);
+    const existingData = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    if (!existingResume) {
-      return Response.json(
-        { error: "Resume not found" },
-        { status: 404 }
-      );
+    const existingResume = existingData.resumes_by_pk;
+
+    if (!existingResume || existingResume.clerk_user_id !== userId) {
+      return Response.json({ error: "Resume not found" }, { status: 404 });
     }
 
     const body = (await request.json()) as {
@@ -109,11 +80,11 @@ export async function PATCH(
       changeReason?: string;
     };
 
-    // 업데이트할 필드 검증 및 준비
+    // 업데이트할 필드 검증
     const updateData: {
       title?: string;
       content?: string | null;
-      isActive?: number;
+      isActive?: boolean;
       version?: number;
     } = {};
 
@@ -144,11 +115,9 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      // SQLite uses integer for boolean: 1 for true, 0 for false
-      updateData.isActive = body.is_active ? 1 : 0;
+      updateData.isActive = body.is_active;
     }
 
-    // 업데이트할 필드가 없으면 에러
     if (Object.keys(updateData).length === 0) {
       return Response.json(
         { error: "No valid fields to update" },
@@ -157,53 +126,44 @@ export async function PATCH(
     }
 
     // 변경사항이 있는 경우에만 히스토리 저장
-    // (title이나 content가 변경되는 경우)
-    const shouldSaveHistory = 
+    const shouldSaveHistory =
       (body.title !== undefined && body.title !== existingResume.title) ||
       (body.content !== undefined && body.content !== existingResume.content);
 
     if (shouldSaveHistory) {
-      // 현재 버전을 히스토리에 저장
       const historyId = crypto.randomUUID();
-      const historyEntry: NewResumeHistory = {
+
+      await graphqlClient.request(INSERT_RESUME_HISTORY, {
         historyId,
-        resumeId: existingResume.resumeId,
-        clerkUserId: existingResume.clerkUserId,
+        resumeId: existingResume.resume_id,
+        userId: existingResume.clerk_user_id,
         title: existingResume.title,
         content: existingResume.content,
         version: existingResume.version,
-        fileUrl: existingResume.fileUrl || null,
-        aiFeedback: existingResume.aiFeedback || null,
+        fileUrl: existingResume.file_url,
+        aiFeedback: existingResume.ai_feedback,
         score: existingResume.score,
         changeReason: body.changeReason || null,
-      };
+      });
 
-      await db.insert(resumeHistory).values(historyEntry);
-
-      // 버전 증가
       updateData.version = existingResume.version + 1;
     }
 
     // 이력서 업데이트
-    const [updatedResume] = await db
-      .update(resumes)
-      .set({
-        ...updateData,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(resumes.resumeId, resumeId))
-      .returning();
+    const result = await graphqlClient.request<{
+      update_resumes_by_pk: Resume;
+    }>(UPDATE_RESUME_METADATA, {
+      resumeId,
+      ...updateData,
+    });
 
     return Response.json({
       success: true,
-      resume: updatedResume,
+      resume: result.update_resumes_by_pk,
     });
   } catch (error) {
     console.error("Error updating resume:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -211,48 +171,30 @@ export async function PATCH(
  * DELETE /api/resumes/[id]
  * 이력서 삭제 (소프트 삭제: is_active = false)
  */
-export async function DELETE(
-  request: Request,
-  { params }: RouteParams
-) {
+export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDrizzleDB();
-    const { id } = await params;
-    const resumeId = id;
+    const { id: resumeId } = await params;
 
     // 먼저 이력서가 존재하고 본인의 것인지 확인
-    const [existingResume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(
-          eq(resumes.resumeId, resumeId),
-          eq(resumes.clerkUserId, userId)
-        )
-      )
-      .limit(1);
+    const existingData = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    if (!existingResume) {
-      return Response.json(
-        { error: "Resume not found" },
-        { status: 404 }
-      );
+    const existingResume = existingData.resumes_by_pk;
+
+    if (!existingResume || existingResume.clerk_user_id !== userId) {
+      return Response.json({ error: "Resume not found" }, { status: 404 });
     }
 
-    // 소프트 삭제: is_active = 0 (SQLite uses integer for boolean)
-    await db
-      .update(resumes)
-      .set({ isActive: 0 })
-      .where(eq(resumes.resumeId, resumeId));
+    // 소프트 삭제
+    await graphqlClient.request(SOFT_DELETE_RESUME, { resumeId });
 
     return Response.json({
       success: true,
@@ -260,10 +202,6 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Error deleting resume:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

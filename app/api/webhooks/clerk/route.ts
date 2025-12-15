@@ -1,10 +1,8 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { getRequestContext } from "@cloudflare/next-on-pages";
+import { graphqlClient, INSERT_USER, DELETE_USER } from "@/lib/graphql";
 
 export async function POST(req: Request) {
   // 환경 변수 가져오기 (로컬 개발 환경과 Cloudflare 환경 모두 지원)
@@ -58,15 +56,16 @@ export async function POST(req: Request) {
   }
 
   const eventType = evt.type;
-  const db = getDrizzleDB();
 
   try {
     // 사용자 생성 이벤트 처리
     if (eventType === "user.created") {
-      const { id } = evt.data;
+      const { id, email_addresses } = evt.data;
+      const primaryEmail = email_addresses?.[0]?.email_address || null;
 
-      await db.insert(users).values({
-        clerkUserId: id,
+      await graphqlClient.request(INSERT_USER, {
+        userId: id,
+        email: primaryEmail,
         languagePreference: "en",
       });
 
@@ -75,10 +74,7 @@ export async function POST(req: Request) {
 
     // 사용자 업데이트 이벤트 처리
     if (eventType === "user.updated") {
-      const { id } = evt.data;
-
-      // updated_at은 트리거에 의해 자동으로 업데이트됩니다
-      // language_preference만 업데이트가 필요한 경우 여기서 처리할 수 있습니다
+      // updated_at은 Hasura 트리거에 의해 자동으로 업데이트됩니다
       return new Response("User updated successfully", { status: 200 });
     }
 
@@ -91,8 +87,8 @@ export async function POST(req: Request) {
         return new Response("Error: No user ID found", { status: 400 });
       }
 
-      // CASCADE로 자동 삭제되지만 명시적으로 처리
-      await db.delete(users).where(eq(users.clerkUserId, id));
+      // CASCADE로 관련 데이터 자동 삭제
+      await graphqlClient.request(DELETE_USER, { userId: id });
 
       return new Response("User deleted successfully", { status: 200 });
     }

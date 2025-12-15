@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import {
-  getQuestionsByUserId,
-  getQuestionStats,
-  type QuestionFilters,
+  graphqlClient,
+  GET_QUESTIONS,
+  GET_BOOKMARKED_QUESTIONS,
+  GET_QUESTION_STATS,
+  type GetQuestionsResponse,
+  type GetQuestionStatsResponse,
   type QuestionCategory,
-} from "@/lib/db/questions";
-import { questionCategoryEnum } from "@/lib/db/schema";
+} from "@/lib/graphql";
 
 export const runtime = "edge";
+
+// Valid question categories
+const validCategories: QuestionCategory[] = [
+  "behavioral",
+  "technical",
+  "system_design",
+  "leadership",
+  "problem_solving",
+  "company_specific",
+];
 
 /**
  * GET /api/questions
@@ -32,35 +44,70 @@ export async function GET(request: NextRequest) {
 
     // 통계만 요청한 경우
     if (statsOnly) {
-      const stats = await getQuestionStats(userId);
+      const data = await graphqlClient.request<GetQuestionStatsResponse>(
+        GET_QUESTION_STATS,
+        { userId }
+      );
+
+      const stats = {
+        total: data.total.aggregate.count,
+        bookmarked: data.bookmarked.aggregate.count,
+        byCategory: {
+          behavioral: data.behavioral.aggregate.count,
+          technical: data.technical.aggregate.count,
+          system_design: data.system_design.aggregate.count,
+          leadership: data.leadership.aggregate.count,
+          problem_solving: data.problem_solving.aggregate.count,
+          company_specific: data.company_specific.aggregate.count,
+        },
+      };
+
       return NextResponse.json({ stats });
     }
 
     // 필터 파싱
-    const filters: QuestionFilters = {};
-
     const category = searchParams.get("category");
-    if (
-      category &&
-      questionCategoryEnum.includes(category as QuestionCategory)
-    ) {
-      filters.category = category as QuestionCategory;
-    }
-
     const bookmarked = searchParams.get("bookmarked");
-    if (bookmarked === "true") {
-      filters.isBookmarked = true;
-    } else if (bookmarked === "false") {
-      filters.isBookmarked = false;
-    }
-
     const resumeId = searchParams.get("resumeId");
-    if (resumeId) {
-      filters.resumeId = resumeId;
+
+    // 북마크만 조회하는 경우
+    if (bookmarked === "true") {
+      const data = await graphqlClient.request<GetQuestionsResponse>(
+        GET_BOOKMARKED_QUESTIONS,
+        { userId }
+      );
+
+      let questions = data.interview_questions;
+
+      // 추가 필터 적용
+      if (category && validCategories.includes(category as QuestionCategory)) {
+        questions = questions.filter((q) => q.category === category);
+      }
+      if (resumeId) {
+        questions = questions.filter((q) => q.resume_id === resumeId);
+      }
+
+      return NextResponse.json({ questions });
     }
 
-    // 질문 목록 조회
-    const questions = await getQuestionsByUserId(userId, filters);
+    // 전체 질문 조회
+    const data = await graphqlClient.request<GetQuestionsResponse>(
+      GET_QUESTIONS,
+      { userId }
+    );
+
+    let questions = data.interview_questions;
+
+    // 클라이언트 측 필터링 (추후 GraphQL where 절로 최적화 가능)
+    if (category && validCategories.includes(category as QuestionCategory)) {
+      questions = questions.filter((q) => q.category === category);
+    }
+    if (bookmarked === "false") {
+      questions = questions.filter((q) => !q.is_bookmarked);
+    }
+    if (resumeId) {
+      questions = questions.filter((q) => q.resume_id === resumeId);
+    }
 
     return NextResponse.json({ questions });
   } catch (error) {

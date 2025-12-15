@@ -1,20 +1,19 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes, questionCategoryEnum } from "@/lib/db/schema";
-import {
-  createQuestions,
-  toggleBookmark as dbToggleBookmark,
-  deleteQuestion as dbDeleteQuestion,
-  getQuestionById,
-  type QuestionCategory,
-  type CreateQuestionInput,
-} from "@/lib/db/questions";
-import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
 import { randomUUID } from "node:crypto";
+import {
+  graphqlClient,
+  GET_RESUME_BY_ID,
+  CREATE_QUESTIONS,
+  TOGGLE_BOOKMARK,
+  DELETE_QUESTION,
+  type GetResumeByIdResponse,
+  type CreateQuestionInput,
+  type QuestionCategory,
+} from "@/lib/graphql";
 
 interface GeneratedQuestion {
   questionText: string;
@@ -29,6 +28,16 @@ interface GenerateResult {
   error?: string;
   questionsCreated?: number;
 }
+
+// Question categories for prompt
+const questionCategoryEnum = [
+  "behavioral",
+  "technical",
+  "system_design",
+  "leadership",
+  "problem_solving",
+  "company_specific",
+] as const;
 
 /**
  * R2에서 PDF를 가져와 OpenAI Files API에 업로드하고 fileId를 반환
@@ -70,23 +79,23 @@ export async function generateQuestionsFromResume(
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    const db = getDrizzleDB();
+    // GraphQL로 이력서 조회
+    const data = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    // 이력서 소유권 확인
-    const [resume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId))
-      )
-      .limit(1);
+    const resume = data.resumes_by_pk;
 
     if (!resume) return { success: false, error: "Resume not found" };
-    if (!resume.fileUrl) return { success: false, error: "Resume has no file" };
+    if (resume.clerk_user_id !== userId)
+      return { success: false, error: "Unauthorized" };
+    if (!resume.file_url)
+      return { success: false, error: "Resume has no file" };
 
     try {
       // R2에서 직접 PDF 가져와서 OpenAI에 업로드
-      const fileId = await uploadPdfFromR2(resume.fileUrl);
+      const fileId = await uploadPdfFromR2(resume.file_url);
 
       // 3) Assistant 생성
       const assistant = await openai.beta.assistants.create({
@@ -179,21 +188,27 @@ Return ONLY valid JSON array, nothing else.`,
 
       const generatedQuestions: GeneratedQuestion[] = JSON.parse(responseText);
 
-      // 8) DB에 질문 저장
+      // 8) GraphQL로 질문 저장
       const questionsToInsert: CreateQuestionInput[] = generatedQuestions.map(
         (q) => ({
-          questionId: randomUUID(),
-          resumeId: resumeId,
-          clerkUserId: userId,
-          questionText: q.questionText,
+          question_id: randomUUID(),
+          resume_id: resumeId,
+          clerk_user_id: userId,
+          question_text: q.questionText,
           category: q.category,
           difficulty: q.difficulty,
-          suggestedAnswer: q.suggestedAnswer,
+          suggested_answer: q.suggestedAnswer,
           tips: q.tips,
         })
       );
 
-      const count = await createQuestions(questionsToInsert);
+      const result = await graphqlClient.request<{
+        insert_interview_questions: {
+          affected_rows: number;
+        };
+      }>(CREATE_QUESTIONS, { objects: questionsToInsert });
+
+      const count = result.insert_interview_questions.affected_rows;
 
       // 9) 정리 (파일 및 Assistant 삭제)
       await openai.files.delete(fileId).catch(console.error);
@@ -222,20 +237,23 @@ interface ToggleBookmarkResult {
 /**
  * 질문 북마크 토글
  * @param questionId 질문 ID
+ * @param currentState 현재 북마크 상태
  * @returns 토글 결과
  */
 export async function toggleQuestionBookmark(
-  questionId: string
+  questionId: string,
+  currentState: boolean = false
 ): Promise<ToggleBookmarkResult> {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    const newState = await dbToggleBookmark(questionId, userId);
+    const newState = !currentState;
 
-    if (newState === null) {
-      return { success: false, error: "Question not found" };
-    }
+    await graphqlClient.request(TOGGLE_BOOKMARK, {
+      questionId,
+      isBookmarked: newState,
+    });
 
     revalidatePath("/service/questions");
     return { success: true, isBookmarked: newState };
@@ -255,20 +273,12 @@ interface DeleteResult {
  * @param questionId 질문 ID
  * @returns 삭제 결과
  */
-export async function deleteQuestion(
-  questionId: string
-): Promise<DeleteResult> {
+export async function deleteQuestion(questionId: string): Promise<DeleteResult> {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    // 권한 확인
-    const question = await getQuestionById(questionId, userId);
-    if (!question) {
-      return { success: false, error: "Question not found" };
-    }
-
-    await dbDeleteQuestion(questionId, userId);
+    await graphqlClient.request(DELETE_QUESTION, { questionId });
 
     revalidatePath("/service/questions");
     return { success: true };

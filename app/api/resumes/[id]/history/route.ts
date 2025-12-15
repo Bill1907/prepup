@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes, resumeHistory } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  graphqlClient,
+  GET_RESUME_BY_ID,
+  GET_RESUME_HISTORY_ALL,
+  type GetResumeByIdResponse,
+} from "@/lib/graphql";
 
 interface RouteParams {
   params: Promise<{
@@ -9,45 +12,51 @@ interface RouteParams {
   }>;
 }
 
+interface ResumeHistoryAllResponse {
+  resume_history: Array<{
+    history_id: string;
+    resume_id: string;
+    clerk_user_id: string;
+    title: string;
+    content: string | null;
+    version: number;
+    file_url: string | null;
+    ai_feedback: Record<string, unknown> | null;
+    score: number | null;
+    change_reason: string | null;
+    created_at: string;
+  }>;
+  resume_history_aggregate: {
+    aggregate: {
+      count: number;
+    };
+  };
+}
+
 /**
  * GET /api/resumes/[id]/history
  * 특정 이력서의 히스토리 목록 조회
  */
-export async function GET(
-  request: Request,
-  { params }: RouteParams
-) {
+export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return Response.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDrizzleDB();
-    const { id } = await params;
-    const resumeId = id;
+    const { id: resumeId } = await params;
 
     // 먼저 이력서가 존재하고 본인의 것인지 확인
-    const [resume] = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(
-          eq(resumes.resumeId, resumeId),
-          eq(resumes.clerkUserId, userId)
-        )
-      )
-      .limit(1);
+    const resumeData = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    if (!resume) {
-      return Response.json(
-        { error: "Resume not found" },
-        { status: 404 }
-      );
+    const resume = resumeData.resumes_by_pk;
+
+    if (!resume || resume.clerk_user_id !== userId) {
+      return Response.json({ error: "Resume not found" }, { status: 404 });
     }
 
     // 페이지네이션 파라미터
@@ -56,45 +65,30 @@ export async function GET(
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
     // 히스토리 조회 (최신순)
-    const history = await db
-      .select()
-      .from(resumeHistory)
-      .where(
-        and(
-          eq(resumeHistory.resumeId, resumeId),
-          eq(resumeHistory.clerkUserId, userId)
-        )
-      )
-      .orderBy(desc(resumeHistory.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    // 전체 개수 조회
-    const totalCount = await db
-      .select({ count: resumeHistory.historyId })
-      .from(resumeHistory)
-      .where(
-        and(
-          eq(resumeHistory.resumeId, resumeId),
-          eq(resumeHistory.clerkUserId, userId)
-        )
+    const historyData =
+      await graphqlClient.request<ResumeHistoryAllResponse>(
+        GET_RESUME_HISTORY_ALL,
+        {
+          resumeId,
+          userId,
+          limit,
+          offset,
+        }
       );
 
+    const total = historyData.resume_history_aggregate.aggregate.count;
+
     return Response.json({
-      history,
+      history: historyData.resume_history,
       pagination: {
-        total: totalCount.length,
+        total,
         limit,
         offset,
-        hasMore: offset + limit < totalCount.length,
+        hasMore: offset + limit < total,
       },
     });
   } catch (error) {
     console.error("Error fetching resume history:", error);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

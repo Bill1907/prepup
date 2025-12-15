@@ -10,11 +10,34 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, Star, FileText, Download } from "lucide-react";
-import { getDrizzleDB } from "@/lib/db";
-import { resumes, resumeHistory } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
-import type { ResumeHistory } from "@/types/database";
+import { ArrowLeft, Clock, Star, FileText } from "lucide-react";
+import {
+  graphqlClient,
+  GET_RESUME_BY_ID,
+  GET_RESUME_HISTORY_ALL,
+  type GetResumeByIdResponse,
+} from "@/lib/graphql";
+
+interface ResumeHistoryAllResponse {
+  resume_history: Array<{
+    history_id: string;
+    resume_id: string;
+    clerk_user_id: string;
+    title: string;
+    content: string | null;
+    version: number;
+    file_url: string | null;
+    ai_feedback: Record<string, unknown> | null;
+    score: number | null;
+    change_reason: string | null;
+    created_at: string;
+  }>;
+  resume_history_aggregate: {
+    aggregate: {
+      count: number;
+    };
+  };
+}
 
 /**
  * 날짜 포맷팅
@@ -56,10 +79,27 @@ function formatRelativeTime(dateString: string): string {
 /**
  * AI Feedback 파싱
  */
-function parseAIFeedback(aiFeedback: string | null): string {
+function parseAIFeedback(
+  aiFeedback: Record<string, unknown> | string | null
+): string {
   if (!aiFeedback) return "";
 
   try {
+    // 이미 객체인 경우
+    if (typeof aiFeedback === "object") {
+      if ("summary" in aiFeedback && typeof aiFeedback.summary === "string") {
+        return aiFeedback.summary;
+      }
+      if (
+        "overall_feedback" in aiFeedback &&
+        typeof aiFeedback.overall_feedback === "string"
+      ) {
+        return aiFeedback.overall_feedback;
+      }
+      return JSON.stringify(aiFeedback);
+    }
+
+    // 문자열인 경우 파싱 시도
     const parsed = JSON.parse(aiFeedback);
     if (typeof parsed === "string") {
       return parsed;
@@ -72,7 +112,7 @@ function parseAIFeedback(aiFeedback: string | null): string {
     }
     return JSON.stringify(parsed);
   } catch {
-    return aiFeedback;
+    return typeof aiFeedback === "string" ? aiFeedback : "";
   }
 }
 
@@ -89,44 +129,35 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
     redirect("/auth/sign-in");
   }
 
-  const { id } = await params;
-  const resumeId = id;
+  const { id: resumeId } = await params;
 
-  const db = getDrizzleDB();
+  // GraphQL로 이력서 조회
+  const resumeData = await graphqlClient.request<GetResumeByIdResponse>(
+    GET_RESUME_BY_ID,
+    { resumeId }
+  );
 
-  // 이력서 조회
-  const [resume] = await db
-    .select()
-    .from(resumes)
-    .where(
-      and(
-        eq(resumes.resumeId, resumeId),
-        eq(resumes.clerkUserId, userId),
-        eq(resumes.isActive, 1) // SQLite uses integer: 1 = true
-      )
-    )
-    .limit(1);
+  const resume = resumeData.resumes_by_pk;
 
-  if (!resume) {
+  if (!resume || resume.clerk_user_id !== userId || !resume.is_active) {
     notFound();
   }
 
-  // 히스토리 조회 (에러 처리 포함)
-  let history: ResumeHistory[] = [];
+  // GraphQL로 히스토리 조회
+  let history: ResumeHistoryAllResponse["resume_history"] = [];
   try {
-    history = await db
-      .select()
-      .from(resumeHistory)
-      .where(
-        and(
-          eq(resumeHistory.resumeId, resumeId),
-          eq(resumeHistory.clerkUserId, userId)
-        )
-      )
-      .orderBy(desc(resumeHistory.createdAt));
+    const historyData =
+      await graphqlClient.request<ResumeHistoryAllResponse>(
+        GET_RESUME_HISTORY_ALL,
+        {
+          resumeId,
+          userId,
+          limit: 50,
+          offset: 0,
+        }
+      );
+    history = historyData.resume_history;
   } catch (error) {
-    // 테이블이 아직 생성되지 않았거나 다른 에러가 발생한 경우
-    // 빈 배열로 처리하여 페이지는 정상적으로 표시되도록 함
     console.error("Error fetching resume history:", error);
     history = [];
   }
@@ -163,7 +194,7 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
                 <Badge variant="default">v{resume.version}</Badge>
               </CardTitle>
               <CardDescription>
-                Last updated {formatRelativeTime(resume.updatedAt)}
+                Last updated {formatRelativeTime(resume.updated_at)}
               </CardDescription>
             </div>
             <Button variant="outline" asChild>
@@ -203,11 +234,11 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
                 </div>
               </div>
             )}
-            {resume.aiFeedback && (
+            {resume.ai_feedback && (
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   <strong>AI Feedback:</strong>{" "}
-                  {parseAIFeedback(resume.aiFeedback)}
+                  {parseAIFeedback(resume.ai_feedback)}
                 </p>
               </div>
             )}
@@ -234,7 +265,7 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
         ) : (
           <div className="space-y-4">
             {history.map((entry, index) => (
-              <Card key={entry.historyId} className="relative">
+              <Card key={entry.history_id} className="relative">
                 {/* Timeline connector */}
                 {index < history.length - 1 && (
                   <div className="absolute left-8 top-16 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
@@ -251,18 +282,18 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
                           <Badge variant="outline">v{entry.version}</Badge>
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          {formatDate(entry.createdAt)} •{" "}
-                          {formatRelativeTime(entry.createdAt)}
+                          {formatDate(entry.created_at)} •{" "}
+                          {formatRelativeTime(entry.created_at)}
                         </CardDescription>
                       </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pl-16 space-y-4">
-                  {entry.changeReason && (
+                  {entry.change_reason && (
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                       <p className="text-sm">
-                        <strong>Change Reason:</strong> {entry.changeReason}
+                        <strong>Change Reason:</strong> {entry.change_reason}
                       </p>
                     </div>
                   )}
@@ -309,20 +340,20 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
                     </div>
                   )}
 
-                  {entry.aiFeedback && (
+                  {entry.ai_feedback && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                       <p className="text-xs text-gray-700 dark:text-gray-300">
                         <strong>AI Feedback:</strong>{" "}
-                        {parseAIFeedback(entry.aiFeedback)}
+                        {parseAIFeedback(entry.ai_feedback)}
                       </p>
                     </div>
                   )}
 
-                  {entry.fileUrl && (
+                  {entry.file_url && (
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-gray-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        File: {entry.fileUrl.split("/").pop()}
+                        File: {entry.file_url.split("/").pop()}
                       </span>
                     </div>
                   )}
