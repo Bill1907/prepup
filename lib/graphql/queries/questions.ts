@@ -15,6 +15,7 @@ export const GET_QUESTIONS = gql`
       difficulty
       suggested_answer
       tips
+      tags
       is_bookmarked
       created_at
     }
@@ -34,6 +35,7 @@ export const GET_QUESTIONS_BY_RESUME = gql`
       difficulty
       suggested_answer
       tips
+      tags
       is_bookmarked
       created_at
     }
@@ -123,6 +125,7 @@ export const GET_BOOKMARKED_QUESTIONS = gql`
       difficulty
       suggested_answer
       tips
+      tags
       is_bookmarked
       created_at
     }
@@ -184,6 +187,7 @@ export interface Question {
   difficulty: QuestionDifficulty | null;
   suggested_answer: string | null;
   tips: string | null;
+  tags: string | null; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
   is_bookmarked: boolean;
   created_at: string;
 }
@@ -214,4 +218,5 @@ export interface CreateQuestionInput {
   difficulty: QuestionDifficulty;
   suggested_answer: string;
   tips: string;
+  tags?: string; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
 }

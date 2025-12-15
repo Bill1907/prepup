@@ -124,6 +124,7 @@ export const interviewQuestions = sqliteTable(
     difficulty: text("difficulty").$type<(typeof difficultyEnum)[number]>(),
     suggestedAnswer: text("suggested_answer"),
     tips: text("tips"),
+    tags: text("tags"), // JSON array as TEXT (e.g., '["자기소개", "프로젝트경험", "React"]')
     isBookmarked: integer("is_bookmarked", { mode: "boolean" })
       .notNull()
       .default(false),

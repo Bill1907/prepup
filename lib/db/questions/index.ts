@@ -108,6 +108,7 @@ export interface CreateQuestionInput {
   difficulty?: "easy" | "medium" | "hard";
   suggestedAnswer?: string;
   tips?: string;
+  tags?: string; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
 }
 
 /**
