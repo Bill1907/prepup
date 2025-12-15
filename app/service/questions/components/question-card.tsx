@@ -33,11 +33,16 @@ const categoryLabels: Record<QuestionCategory, string> = {
 
 const categoryColors: Record<QuestionCategory, string> = {
   behavioral: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  technical: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-  system_design: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-  leadership: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  problem_solving: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  company_specific: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
+  technical:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+  system_design:
+    "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+  leadership:
+    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  problem_solving:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  company_specific:
+    "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
 };
 
 export function QuestionCard({ question }: QuestionCardProps) {
@@ -140,6 +145,7 @@ export function QuestionCard({ question }: QuestionCardProps) {
         )}
 
         <div className="flex gap-2">
+          {/* @TODO: 이부분 기획적으로 생각해 봐야함 */}
           <Button size="sm" asChild>
             <Link href={`/service/questions/${question.questionId}/practice`}>
               Practice
