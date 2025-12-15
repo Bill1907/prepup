@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
 import { randomUUID } from "node:crypto";
+import { validateFileKey, getPresignedUrl } from "@/lib/r2";
 import {
   graphqlClient,
   GET_RESUME_BY_ID,
@@ -41,30 +42,68 @@ const questionCategoryEnum = [
 
 /**
  * R2에서 PDF를 가져와 OpenAI Files API에 업로드하고 fileId를 반환
- * Cloudflare Workers 환경에서 동작하도록 메모리 기반 처리 사용
+ * Presigned URL을 통해 파일 데이터를 가져옴 (로컬 개발 환경에서도 작동)
  */
-async function uploadPdfFromR2(fileKey: string): Promise<string> {
-  // R2에서 파일 데이터 가져오기
-  const { getFileData } = await import("@/lib/db/index");
-  const arrayBuffer = await getFileData(fileKey);
+async function uploadPdfFromR2(fileKey: string, userId: string): Promise<string> {
+  console.log(`[QUESTIONS] Starting PDF upload from R2, fileKey: ${fileKey}`);
 
-  if (!arrayBuffer) {
-    throw new Error("File not found in R2");
+  const validation = validateFileKey(fileKey);
+  if (!validation.valid) {
+    throw new Error(validation.message);
   }
 
-  // File 객체 생성 (메모리에서 직접 - fs 모듈 불필요)
-  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-  const fileObject = new File([blob], `resume_${Date.now()}.pdf`, {
-    type: "application/pdf",
-  });
+  try {
+    // Presigned URL 생성 (5분 만료)
+    console.log(`[QUESTIONS] Generating presigned URL for file...`);
+    const presignedUrl = await getPresignedUrl(fileKey, 300);
+    console.log(`[QUESTIONS] Got presigned URL, fetching file...`);
 
-  // OpenAI에 직접 업로드
-  const uploadedFile = await openai.files.create({
-    file: fileObject,
-    purpose: "assistants",
-  });
+    // Presigned URL을 사용하여 파일 다운로드
+    const response = await fetch(presignedUrl, {
+      method: "GET",
+    });
 
-  return uploadedFile.id;
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch file from storage (${response.status}): ${response.statusText}`
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error(
+        `Resume file not found or empty. File key: ${fileKey}. ` +
+          `Please ensure the resume was uploaded correctly.`
+      );
+    }
+
+    console.log(
+      `[QUESTIONS] Retrieved file from API, size: ${arrayBuffer.byteLength} bytes`
+    );
+
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    const fileObject = new File([blob], `resume_${Date.now()}.pdf`, {
+      type: "application/pdf",
+    });
+
+    console.log(`[QUESTIONS] Uploading to OpenAI Files API...`);
+    const uploadedFile = await openai.files.create({
+      file: fileObject,
+      purpose: "assistants",
+    });
+
+    console.log(
+      `[QUESTIONS] Successfully uploaded to OpenAI: ${uploadedFile.id}`
+    );
+    return uploadedFile.id;
+  } catch (error) {
+    console.error(
+      `[QUESTIONS] Upload failed for file key "${fileKey}":`,
+      error
+    );
+    throw error;
+  }
 }
 
 /**
@@ -77,9 +116,10 @@ export async function generateQuestionsFromResume(
 ): Promise<GenerateResult> {
   try {
     const { userId } = await auth();
-    if (!userId) return { success: false, error: "Unauthorized" };
+    if (!userId) {
+      return { success: false, error: "Authentication required" };
+    }
 
-    // GraphQL로 이력서 조회
     const data = await graphqlClient.request<GetResumeByIdResponse>(
       GET_RESUME_BY_ID,
       { resumeId }
@@ -87,17 +127,19 @@ export async function generateQuestionsFromResume(
 
     const resume = data.resumes_by_pk;
 
-    if (!resume) return { success: false, error: "Resume not found" };
-    if (resume.clerk_user_id !== userId)
-      return { success: false, error: "Unauthorized" };
-    if (!resume.file_url)
-      return { success: false, error: "Resume has no file" };
+    if (!resume) {
+      return { success: false, error: "Resume not found" };
+    }
+    if (resume.clerk_user_id !== userId) {
+      return { success: false, error: "Unauthorized access to resume" };
+    }
+    if (!resume.file_url) {
+      return { success: false, error: "Resume file not uploaded" };
+    }
 
     try {
-      // R2에서 직접 PDF 가져와서 OpenAI에 업로드
-      const fileId = await uploadPdfFromR2(resume.file_url);
+      const fileId = await uploadPdfFromR2(resume.file_url, userId);
 
-      // 3) Assistant 생성
       const assistant = await openai.beta.assistants.create({
         name: "Interview Question Generator",
         instructions: `You are an expert career coach and interviewer. Analyze resumes and generate relevant interview questions.
@@ -110,7 +152,6 @@ Generate questions that are:
         tools: [{ type: "file_search" }],
       });
 
-      // 4) Thread 생성 및 질문 생성 요청
       const categories = questionCategoryEnum.join(", ");
       const thread = await openai.beta.threads.create({
         messages: [
@@ -155,7 +196,6 @@ Return ONLY valid JSON array, nothing else.`,
         ],
       });
 
-      // 5) Run 실행 및 완료 대기
       const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
         assistant_id: assistant.id,
       });
@@ -164,7 +204,6 @@ Return ONLY valid JSON array, nothing else.`,
         throw new Error(`Run failed with status: ${run.status}`);
       }
 
-      // 6) 응답 가져오기
       const messages = await openai.beta.threads.messages.list(thread.id);
       const lastMessage = messages.data[0];
 
@@ -172,7 +211,6 @@ Return ONLY valid JSON array, nothing else.`,
         throw new Error("No assistant response found");
       }
 
-      // 7) 텍스트 추출
       const textContent = lastMessage.content.find((c) => c.type === "text");
       if (!textContent || textContent.type !== "text") {
         throw new Error("No text content in response");
@@ -180,7 +218,6 @@ Return ONLY valid JSON array, nothing else.`,
 
       let responseText = textContent.text.value;
 
-      // JSON만 추출 (markdown 코드 블록 제거)
       responseText = responseText
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -188,7 +225,6 @@ Return ONLY valid JSON array, nothing else.`,
 
       const generatedQuestions: GeneratedQuestion[] = JSON.parse(responseText);
 
-      // 8) GraphQL로 질문 저장
       const questionsToInsert: CreateQuestionInput[] = generatedQuestions.map(
         (q) => ({
           question_id: randomUUID(),
@@ -210,21 +246,24 @@ Return ONLY valid JSON array, nothing else.`,
 
       const count = result.insert_interview_questions.affected_rows;
 
-      // 9) 정리 (파일 및 Assistant 삭제)
-      await openai.files.delete(fileId).catch(console.error);
-      await openai.beta.assistants.delete(assistant.id).catch(console.error);
+      await Promise.all([
+        openai.files.delete(fileId).catch(console.error),
+        openai.beta.assistants.delete(assistant.id).catch(console.error),
+      ]);
 
       revalidatePath("/service/questions");
       return { success: true, questionsCreated: count };
     } catch (error) {
       console.error("[QUESTIONS] Generation Error:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Internal server error";
+        error instanceof Error ? error.message : "Question generation failed";
       return { success: false, error: errorMessage };
     }
   } catch (error) {
-    console.error("[QUESTIONS] Action Error:", error);
-    return { success: false, error: "Failed to generate questions" };
+    console.error("[QUESTIONS] Unexpected Error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate questions";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -246,7 +285,9 @@ export async function toggleQuestionBookmark(
 ): Promise<ToggleBookmarkResult> {
   try {
     const { userId } = await auth();
-    if (!userId) return { success: false, error: "Unauthorized" };
+    if (!userId) {
+      return { success: false, error: "Authentication required" };
+    }
 
     const newState = !currentState;
 
@@ -259,7 +300,9 @@ export async function toggleQuestionBookmark(
     return { success: true, isBookmarked: newState };
   } catch (error) {
     console.error("[QUESTIONS] Toggle Bookmark Error:", error);
-    return { success: false, error: "Failed to toggle bookmark" };
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to toggle bookmark";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -273,10 +316,14 @@ interface DeleteResult {
  * @param questionId 질문 ID
  * @returns 삭제 결과
  */
-export async function deleteQuestion(questionId: string): Promise<DeleteResult> {
+export async function deleteQuestion(
+  questionId: string
+): Promise<DeleteResult> {
   try {
     const { userId } = await auth();
-    if (!userId) return { success: false, error: "Unauthorized" };
+    if (!userId) {
+      return { success: false, error: "Authentication required" };
+    }
 
     await graphqlClient.request(DELETE_QUESTION, { questionId });
 
@@ -284,6 +331,8 @@ export async function deleteQuestion(questionId: string): Promise<DeleteResult> 
     return { success: true };
   } catch (error) {
     console.error("[QUESTIONS] Delete Error:", error);
-    return { success: false, error: "Failed to delete question" };
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to delete question";
+    return { success: false, error: errorMessage };
   }
 }

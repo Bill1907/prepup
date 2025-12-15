@@ -13,7 +13,14 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const { userId } = await auth();
+    // Try to get userId from Clerk auth first (client requests)
+    const { userId: authUserId } = await auth();
+
+    // For server-to-server requests, check the x-user-id header
+    const headerUserId = request.headers.get("x-user-id");
+
+    // Use whichever is available (prefer auth, fallback to header)
+    const userId = authUserId || headerUserId;
 
     if (!userId) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });

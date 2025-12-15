@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { QuestionCategory } from "@/lib/db/questions";
+import type { QuestionCategory } from "@/lib/graphql/queries/questions";
 
 interface CategoryStats {
   behavioral: number;

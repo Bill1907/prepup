@@ -47,6 +47,9 @@ export function useQuestions() {
       return data.interview_questions;
     },
     enabled: !!userId,
+    retry: false,
+    staleTime: 30000, // 30초 동안 fresh로 간주
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -68,6 +71,9 @@ export function useQuestionsByResume(resumeId: string) {
       return data.interview_questions;
     },
     enabled: !!userId && !!resumeId,
+    retry: false,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -89,6 +95,9 @@ export function useBookmarkedQuestions() {
       return data.interview_questions;
     },
     enabled: !!userId,
+    retry: false,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -122,6 +131,9 @@ export function useQuestionStats() {
       };
     },
     enabled: !!userId,
+    retry: false,
+    staleTime: 60000, // 통계는 1분 동안 캐시
+    refetchOnWindowFocus: false,
   });
 }
 

@@ -125,9 +125,9 @@ export async function listFiles(
 /**
  * R2에서 파일 가져오기
  * @param fileKey R2에 저장된 파일 키
- * @returns R2Object 또는 null (파일이 없는 경우)
+ * @returns R2ObjectBody 또는 null (파일이 없는 경우)
  */
-export async function getFile(fileKey: string): Promise<R2Object | null> {
+export async function getFile(fileKey: string): Promise<R2ObjectBody | null> {
   const r2Bucket = getR2Bucket();
   return await r2Bucket.get(fileKey);
 }
@@ -139,14 +139,26 @@ export async function getFile(fileKey: string): Promise<R2Object | null> {
  * @returns ArrayBuffer 또는 null (파일이 없는 경우)
  */
 export async function getFileData(fileKey: string): Promise<ArrayBuffer | null> {
-  const r2Bucket = getR2Bucket();
-  const file = await r2Bucket.get(fileKey);
+  try {
+    console.log(`[R2] Fetching file with key: ${fileKey}`);
 
-  if (!file) {
-    return null;
+    const r2Bucket = getR2Bucket();
+    const file = await r2Bucket.get(fileKey);
+
+    if (!file) {
+      console.warn(`[R2] File not found: ${fileKey}`);
+      return null;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    console.log(`[R2] Successfully fetched file, size: ${arrayBuffer.byteLength} bytes`);
+    return arrayBuffer;
+  } catch (error) {
+    console.error(`[R2] Error fetching file "${fileKey}":`, error);
+    throw new Error(
+      `Failed to fetch file from R2: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
-
-  return await file.arrayBuffer();
 }
 
 /**
@@ -260,6 +272,41 @@ export async function getPresignedUploadUrl(
 }
 
 // ============ Utility Functions ============
+
+/**
+ * R2 파일 키 검증
+ * @param fileKey R2 파일 키
+ * @returns 유효성 검사 결과와 메시지
+ */
+export function validateFileKey(fileKey: string): {
+  valid: boolean;
+  message?: string;
+} {
+  if (!fileKey || typeof fileKey !== "string") {
+    return {
+      valid: false,
+      message: `Invalid file key: expected non-empty string, got ${typeof fileKey}`,
+    };
+  }
+
+  if (fileKey.trim().length === 0) {
+    return {
+      valid: false,
+      message: "File key cannot be empty",
+    };
+  }
+
+  // R2 파일 키는 일반적으로 "resumes/user_xxx/timestamp-filename.pdf" 형식
+  // 최소한 경로 구분자와 파일명이 있어야 함
+  if (!fileKey.includes("/")) {
+    return {
+      valid: false,
+      message: `File key appears to be invalid format. Expected path format (e.g., "resumes/user_xxx/file.pdf"), got "${fileKey}"`,
+    };
+  }
+
+  return { valid: true };
+}
 
 /**
  * 파일명을 안전하게 정리 (특수문자 제거)

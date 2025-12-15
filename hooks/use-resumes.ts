@@ -52,6 +52,9 @@ export function useResumes() {
       return data.resumes;
     },
     enabled: !!userId,
+    retry: false,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -73,6 +76,9 @@ export function useResume(resumeId: string) {
       return data.resumes_by_pk;
     },
     enabled: !!userId && !!resumeId,
+    retry: false,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -99,6 +105,9 @@ export function useResumeStats() {
       };
     },
     enabled: !!userId,
+    retry: false,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -212,6 +221,9 @@ export function useResumeHistory(resumeId: string) {
       return data.resume_history;
     },
     enabled: !!userId && !!resumeId,
+    retry: false,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 }
 
