@@ -1,12 +1,16 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getDrizzleDB, getPresignedUrl } from "@/lib/db";
-import { resumes } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { getPresignedUrl } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { openai } from "@/lib/openaiClient";
-import { graphqlClient, UPDATE_RESUME_ANALYSIS } from "@/lib/graphql";
+import {
+  graphqlClient,
+  UPDATE_RESUME_ANALYSIS,
+  SOFT_DELETE_RESUME,
+  GET_RESUME_BY_ID,
+  type GetResumeByIdResponse,
+} from "@/lib/graphql";
 
 /**
  * 이력서 삭제 (Soft Delete)
@@ -23,32 +27,23 @@ export async function deleteResume(resumeId: string) {
       };
     }
 
-    const db = getDrizzleDB();
+    // GraphQL로 이력서 조회하여 소유권 확인
+    const data = await graphqlClient.request<GetResumeByIdResponse>(
+      GET_RESUME_BY_ID,
+      { resumeId }
+    );
 
-    // 사용자가 소유한 이력서인지 확인
-    const resume = await db
-      .select()
-      .from(resumes)
-      .where(
-        and(eq(resumes.resumeId, resumeId), eq(resumes.clerkUserId, userId))
-      )
-      .limit(1);
+    const resume = data.resumes_by_pk;
 
-    if (resume.length === 0) {
+    if (!resume || resume.clerk_user_id !== userId) {
       return {
         success: false,
         error: "Resume not found or you don't have permission to delete it.",
       };
     }
 
-    // Soft delete: isActive를 0으로 설정
-    await db
-      .update(resumes)
-      .set({
-        isActive: 0,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(resumes.resumeId, resumeId));
+    // GraphQL로 Soft delete
+    await graphqlClient.request(SOFT_DELETE_RESUME, { resumeId });
 
     // 페이지 재검증
     revalidatePath("/service/resume");
