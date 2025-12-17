@@ -4,7 +4,8 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { graphqlClient } from "@/lib/graphql/client";
 import { GET_QUESTION_BY_ID } from "@/lib/graphql/queries/questions";
 import { GET_RESUME_BY_ID } from "@/lib/graphql/queries/resumes";
-import type { SessionResponse as OpenAISessionResponse } from "@/hooks/use-realtime-voice";
+import { createValidatedAgentConfig } from "@/lib/voice/agent-config";
+import { formatToolsForOpenAI, INTERVIEW_TOOLS } from "@/lib/voice/tools";
 
 export const runtime = "edge";
 
@@ -103,39 +104,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // 6. Build AI instructions with resume context
-    const instructions = `You are an experienced ${question.category} interviewer conducting a structured interview.
+    // 6. Build AI instructions with resume context using agent config
+    const agentConfig = createValidatedAgentConfig({
+      question: {
+        id: question.question_id,
+        text: question.question_text,
+        category: question.category,
+        difficulty: question.difficulty,
+      },
+      resume: {
+        id: resume.resume_id,
+        title: resume.title,
+        analysis: analysisData,
+      },
+    });
 
-INTERVIEW STRUCTURE:
-1. Brief introduction (10-15 seconds): "Hello, I'm your AI interviewer. I'll be asking you about ${question.category} topics based on your resume. Let's begin."
-2. Ask the main question: "${question.question_text}"
-3. Listen carefully to the candidate's response
-4. Ask EXACTLY 3 follow-up questions that:
-   - Explicitly validate specific resume claims (e.g., "You mentioned ${analysisData.strengths[0] || "project X"}. Can you walk me through your specific contributions?")
-   - Probe technical depth appropriate for ${question.difficulty || "medium"} difficulty level
-   - Build naturally on their previous answers
-
-RESUME CONTEXT:
-Summary: ${analysisData.summary}
-
-Key Projects/Experiences to Validate:
-${analysisData.strengths.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-
-Areas to Explore:
-${analysisData.improvements.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-
-${question.tips ? `Interview Tips: ${question.tips}` : ""}
-${question.suggested_answer ? `Suggested Answer Framework: ${question.suggested_answer}` : ""}
-
-CONVERSATION RULES:
-- Target 10-15 minute total duration
-- Wait for approximately 10 seconds of silence before detecting end of user's turn
-- Be professional yet conversational
-- Explicitly reference resume items to verify authenticity (e.g., "In your resume, you mentioned...")
-- Keep questions clear and focused
-- After 3 follow-up questions, conclude with: "Thank you for your responses. That completes our interview."
-
-Begin the interview when the connection is established.`;
+    const instructions = agentConfig.instructions;
 
     // 7. Generate OpenAI Realtime API ephemeral token
     // 환경 변수 가져오기 (로컬 개발 환경과 Cloudflare 환경 모두 지원)
@@ -158,6 +142,9 @@ Begin the interview when the connection is established.`;
       );
     }
 
+    // 7. Format tools for OpenAI
+    const tools = formatToolsForOpenAI();
+
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/realtime/sessions",
       {
@@ -167,15 +154,17 @@ Begin the interview when the connection is established.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-realtime-preview-2024-12-17",
-          voice: "alloy",
+          model: agentConfig.voiceConfig.model,
+          voice: agentConfig.voiceConfig.voice,
           instructions,
           modalities: ["text", "audio"],
           turn_detection: {
-            type: "server_vad",
-            threshold: 0.5,
-            silence_duration_ms: 10000, // 10 seconds (maximum allowed)
+            type: agentConfig.voiceConfig.turnDetection.type,
+            threshold: agentConfig.voiceConfig.turnDetection.threshold,
+            silence_duration_ms: agentConfig.voiceConfig.turnDetection.silenceDuration,
+            prefix_padding_ms: agentConfig.voiceConfig.turnDetection.prefixPadding,
           },
+          tools, // Add tool definitions
         }),
       }
     );
@@ -189,13 +178,17 @@ Begin the interview when the connection is established.`;
       );
     }
 
-    const sessionData = (await openaiResponse.json()) as OpenAISessionResponse;
+    const sessionData = (await openaiResponse.json()) as {
+      client_secret: string;
+      session_id: string;
+      expires_at: string;
+    };
 
-    // 8. Return session token and metadata
+    // 8. Return session token, metadata, and tool configuration
     return NextResponse.json({
-      client_secret: sessionData.client_secret as string,
-      session_id: sessionData.session_id as string,
-      expires_at: sessionData.expires_at as string,
+      client_secret: sessionData.client_secret,
+      session_id: sessionData.session_id,
+      expires_at: sessionData.expires_at,
       question: {
         id: question.question_id,
         text: question.question_text,
@@ -205,7 +198,9 @@ Begin the interview when the connection is established.`;
       resume: {
         id: resume.resume_id,
         title: resume.title,
+        analysis: analysisData, // Include analysis for tool context
       },
+      tools: INTERVIEW_TOOLS, // Return tool definitions for client
     });
   } catch (error) {
     console.error("Error in voice session route:", error);

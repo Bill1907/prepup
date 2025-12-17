@@ -14,6 +14,7 @@ import {
   type QuestionCategory,
 } from "@/lib/graphql/queries/questions";
 import { useRealtimeVoice, type TranscriptMessage } from "@/hooks/use-realtime-voice";
+import type { ConnectionState } from "@/lib/voice/types";
 import { useState, useEffect, useRef } from "react";
 
 const categoryLabels: Record<QuestionCategory, string> = {
@@ -53,9 +54,7 @@ export default function PracticePage() {
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [interviewTime, setInterviewTime] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [connectionState, setConnectionState] = useState<
-    "connecting" | "connected" | "disconnected"
-  >("disconnected");
+  const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
