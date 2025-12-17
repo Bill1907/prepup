@@ -59,7 +59,10 @@ export const GET_QUESTION_STATS = gql`
       }
     }
     behavioral: interview_questions_aggregate(
-      where: { clerk_user_id: { _eq: $userId }, category: { _eq: "behavioral" } }
+      where: {
+        clerk_user_id: { _eq: $userId }
+        category: { _eq: "behavioral" }
+      }
     ) {
       aggregate {
         count
@@ -83,7 +86,10 @@ export const GET_QUESTION_STATS = gql`
       }
     }
     leadership: interview_questions_aggregate(
-      where: { clerk_user_id: { _eq: $userId }, category: { _eq: "leadership" } }
+      where: {
+        clerk_user_id: { _eq: $userId }
+        category: { _eq: "leadership" }
+      }
     ) {
       aggregate {
         count
@@ -128,6 +134,24 @@ export const GET_BOOKMARKED_QUESTIONS = gql`
       tags
       is_bookmarked
       created_at
+    }
+  }
+`;
+
+export const GET_QUESTION_BY_ID = gql`
+  query GetQuestionById($questionId: String!) {
+    interview_questions_by_pk(question_id: $questionId) {
+      question_id
+      resume_id
+      question_text
+      category
+      difficulty
+      suggested_answer
+      tips
+      tags
+      is_bookmarked
+      created_at
+      clerk_user_id
     }
   }
 `;
@@ -190,6 +214,7 @@ export interface Question {
   tags: string | null; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
   is_bookmarked: boolean;
   created_at: string;
+  clerk_user_id?: string; // Optional for backward compatibility
 }
 
 export interface QuestionStats {
@@ -208,6 +233,10 @@ export interface GetQuestionsResponse {
 }
 
 export interface GetQuestionStatsResponse extends QuestionStats {}
+
+export interface GetQuestionByIdResponse {
+  interview_questions_by_pk: Question | null;
+}
 
 export interface CreateQuestionInput {
   question_id: string;

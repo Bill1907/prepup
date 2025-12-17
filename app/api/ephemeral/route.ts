@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
 export const runtime = "edge";
 
@@ -14,7 +15,19 @@ export async function POST(request: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    // 환경 변수 가져오기 (로컬 개발 환경과 Cloudflare 환경 모두 지원)
+    let apiKey: string | undefined;
+
+    try {
+      // Cloudflare Workers 환경에서 시도
+      const { env } = getRequestContext();
+      const typedEnv = env as CloudflareEnv & { OPENAI_API_KEY?: string };
+      apiKey = typedEnv.OPENAI_API_KEY;
+    } catch {
+      // 로컬 개발 환경에서는 process.env 사용
+      apiKey = process.env.OPENAI_API_KEY;
+    }
+
     if (!apiKey) {
       return Response.json(
         { error: "OpenAI API key not configured" },
