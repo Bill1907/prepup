@@ -25,14 +25,30 @@ export default function DownloadResumePage({ params }: PageProps) {
           throw new Error("Failed to download resume");
         }
 
-        // 파일 다운로드
-        const blob = await response.blob();
+        // Presigned URL 받기
+        const data = (await response.json()) as { url: string };
+        const presignedUrl = data.url;
+
+        if (!presignedUrl) {
+          throw new Error("Presigned URL not found in response");
+        }
+
+        // Presigned URL에서 파일 다운로드
+        const fileResponse = await fetch(presignedUrl);
+
+        if (!fileResponse.ok) {
+          throw new Error("Failed to download file from storage");
+        }
+
+        const blob = await fileResponse.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
 
         // Content-Disposition 헤더에서 파일명 추출
-        const contentDisposition = response.headers.get("Content-Disposition");
+        const contentDisposition = fileResponse.headers.get(
+          "Content-Disposition"
+        );
         let filename = "resume.pdf";
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);

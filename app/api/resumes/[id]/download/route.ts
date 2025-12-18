@@ -51,9 +51,9 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Presigned URL 생성 (GET 요청용, 5분 만료)
     const presignedUrl = await getPresignedUrl(resume.file_url, 300);
 
-    // Presigned URL로 리다이렉트
-    // 브라우저가 직접 R2에서 다운로드하므로 Workers 대역폭 절약
-    return Response.redirect(presignedUrl, 302);
+    // Presigned URL을 JSON으로 반환
+    // 클라이언트에서 직접 다운로드 처리
+    return Response.json({ url: presignedUrl });
   } catch (error) {
     console.error("Error generating download URL:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });
