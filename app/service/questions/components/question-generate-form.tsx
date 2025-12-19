@@ -15,7 +15,7 @@ import { generateQuestionsFromResume } from "@/app/actions/question-actions";
 interface Resume {
   resumeId: string;
   title: string;
-  fileUrl: string | null;
+  fileUrl: string | null | undefined;
   createdAt: string;
 }
 

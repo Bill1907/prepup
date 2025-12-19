@@ -1,6 +1,38 @@
 import { gql } from "graphql-request";
 
-// ============ Queries ============
+// Re-export typed documents and types from generated code
+export {
+  GetQuestionsDocument,
+  GetQuestionsByResumeDocument,
+  GetQuestionStatsDocument,
+  GetBookmarkedQuestionsDocument,
+  GetQuestionByIdDocument,
+  ToggleBookmarkDocument,
+  DeleteQuestionDocument,
+  CreateQuestionsDocument,
+} from "../__generated__/graphql";
+
+export type {
+  GetQuestionsQuery,
+  GetQuestionsQueryVariables,
+  GetQuestionsByResumeQuery,
+  GetQuestionsByResumeQueryVariables,
+  GetQuestionStatsQuery,
+  GetQuestionStatsQueryVariables,
+  GetBookmarkedQuestionsQuery,
+  GetBookmarkedQuestionsQueryVariables,
+  GetQuestionByIdQuery,
+  GetQuestionByIdQueryVariables,
+  ToggleBookmarkMutation,
+  ToggleBookmarkMutationVariables,
+  DeleteQuestionMutation,
+  DeleteQuestionMutationVariables,
+  CreateQuestionsMutation,
+  CreateQuestionsMutationVariables,
+  Interview_Questions_Insert_Input,
+} from "../__generated__/graphql";
+
+// ============ Queries (for backward compatibility) ============
 
 export const GET_QUESTIONS = gql`
   query GetQuestions($userId: String!) {
@@ -18,6 +50,7 @@ export const GET_QUESTIONS = gql`
       tags
       is_bookmarked
       created_at
+      clerk_user_id
     }
   }
 `;
@@ -38,6 +71,7 @@ export const GET_QUESTIONS_BY_RESUME = gql`
       tags
       is_bookmarked
       created_at
+      clerk_user_id
     }
   }
 `;
@@ -134,6 +168,7 @@ export const GET_BOOKMARKED_QUESTIONS = gql`
       tags
       is_bookmarked
       created_at
+      clerk_user_id
     }
   }
 `;
@@ -191,8 +226,17 @@ export const CREATE_QUESTIONS = gql`
   }
 `;
 
-// ============ Types ============
+// ============ Legacy Type Aliases (for backward compatibility) ============
+// These map the old manually-defined types to the generated ones
 
+import type {
+  GetQuestionsQuery,
+  GetQuestionStatsQuery,
+  GetQuestionByIdQuery,
+  Interview_Questions_Insert_Input
+} from "../__generated__/graphql";
+
+// Keep business-logic category/difficulty types for type safety in app code
 export type QuestionCategory =
   | "behavioral"
   | "technical"
@@ -203,49 +247,16 @@ export type QuestionCategory =
 
 export type QuestionDifficulty = "easy" | "medium" | "hard";
 
-export interface Question {
-  question_id: string;
-  resume_id: string;
-  question_text: string;
-  category: QuestionCategory | null;
-  difficulty: QuestionDifficulty | null;
-  suggested_answer: string | null;
-  tips: string | null;
-  tags: string | null; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
-  is_bookmarked: boolean;
-  created_at: string;
-  clerk_user_id?: string; // Optional for backward compatibility
-}
+// Question type derived from query result
+export type Question = NonNullable<GetQuestionsQuery["interview_questions"]>[number];
 
-export interface QuestionStats {
-  total: { aggregate: { count: number } };
-  bookmarked: { aggregate: { count: number } };
-  behavioral: { aggregate: { count: number } };
-  technical: { aggregate: { count: number } };
-  system_design: { aggregate: { count: number } };
-  leadership: { aggregate: { count: number } };
-  problem_solving: { aggregate: { count: number } };
-  company_specific: { aggregate: { count: number } };
-}
+// Stats type
+export type QuestionStats = GetQuestionStatsQuery;
 
-export interface GetQuestionsResponse {
-  interview_questions: Question[];
-}
+// Response types for backward compatibility
+export type GetQuestionsResponse = GetQuestionsQuery;
+export type GetQuestionStatsResponse = GetQuestionStatsQuery;
+export type GetQuestionByIdResponse = GetQuestionByIdQuery;
 
-export interface GetQuestionStatsResponse extends QuestionStats {}
-
-export interface GetQuestionByIdResponse {
-  interview_questions_by_pk: Question | null;
-}
-
-export interface CreateQuestionInput {
-  question_id: string;
-  resume_id: string;
-  clerk_user_id: string;
-  question_text: string;
-  category: QuestionCategory;
-  difficulty: QuestionDifficulty;
-  suggested_answer: string;
-  tips: string;
-  tags?: string; // JSON array as string (e.g., '["자기소개", "프로젝트경험"]')
-}
+// Input type for creating questions
+export type CreateQuestionInput = Interview_Questions_Insert_Input;

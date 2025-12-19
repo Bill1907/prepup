@@ -1,6 +1,58 @@
 import { gql } from "graphql-request";
 
-// ============ Queries ============
+// Re-export typed documents and types from generated code
+export {
+  GetResumesDocument,
+  GetResumeByIdDocument,
+  GetResumeStatsDocument,
+  GetResumeHistoryDocument,
+  GetResumeHistoryAllDocument,
+  EnsureUserExistsDocument,
+  UpdateResumeDocument,
+  UpdateResumeAnalysisDocument,
+  SoftDeleteResumeDocument,
+  CreateResumeDocument,
+  UpdateResumeMetadataDocument,
+  InsertResumeHistoryDocument,
+  UpdateResumeFileDocument,
+  InsertUserDocument,
+  DeleteUserDocument,
+} from "../__generated__/graphql";
+
+export type {
+  GetResumesQuery,
+  GetResumesQueryVariables,
+  GetResumeByIdQuery,
+  GetResumeByIdQueryVariables,
+  GetResumeStatsQuery,
+  GetResumeStatsQueryVariables,
+  GetResumeHistoryQuery,
+  GetResumeHistoryQueryVariables,
+  GetResumeHistoryAllQuery,
+  GetResumeHistoryAllQueryVariables,
+  EnsureUserExistsMutation,
+  EnsureUserExistsMutationVariables,
+  UpdateResumeMutation,
+  UpdateResumeMutationVariables,
+  UpdateResumeAnalysisMutation,
+  UpdateResumeAnalysisMutationVariables,
+  SoftDeleteResumeMutation,
+  SoftDeleteResumeMutationVariables,
+  CreateResumeMutation,
+  CreateResumeMutationVariables,
+  UpdateResumeMetadataMutation,
+  UpdateResumeMetadataMutationVariables,
+  InsertResumeHistoryMutation,
+  InsertResumeHistoryMutationVariables,
+  UpdateResumeFileMutation,
+  UpdateResumeFileMutationVariables,
+  InsertUserMutation,
+  InsertUserMutationVariables,
+  DeleteUserMutation,
+  DeleteUserMutationVariables,
+} from "../__generated__/graphql";
+
+// ============ Queries (for backward compatibility) ============
 
 export const GET_RESUMES = gql`
   query GetResumes($userId: String!) {
@@ -152,7 +204,7 @@ export const UPDATE_RESUME = gql`
     $resumeId: String!
     $title: String
     $content: String
-    $aiFeedback: String
+    $aiFeedback: jsonb
     $score: Int
   ) {
     update_resumes_by_pk(
@@ -347,54 +399,25 @@ export const DELETE_USER = gql`
   }
 `;
 
-// ============ Types ============
+// ============ Legacy Type Aliases (for backward compatibility) ============
+// These map the old manually-defined types to the generated ones
 
-export interface Resume {
-  resume_id: string;
-  clerk_user_id: string;
-  title: string;
-  content: string | null;
-  version: number;
-  is_active: boolean;
-  file_url: string | null;
-  ai_feedback: Record<string, unknown> | null;
-  score: number | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { GetResumesQuery, GetResumeByIdQuery, GetResumeStatsQuery, GetResumeHistoryQuery, CreateResumeMutation } from "../__generated__/graphql";
 
-export interface ResumeStats {
-  total: { aggregate: { count: number } };
-  reviewed: { aggregate: { count: number; avg: { score: number | null } } };
-}
+// Resume type derived from query result
+export type Resume = NonNullable<GetResumesQuery["resumes"]>[number];
 
-export interface GetResumesResponse {
-  resumes: Resume[];
-}
+// Stats type
+export type ResumeStats = GetResumeStatsQuery;
 
-export interface GetResumeByIdResponse {
-  resumes_by_pk: Resume | null;
-}
+// Response types for backward compatibility
+export type GetResumesResponse = GetResumesQuery;
+export type GetResumeByIdResponse = GetResumeByIdQuery;
+export type GetResumeStatsResponse = GetResumeStatsQuery;
 
-export interface GetResumeStatsResponse {
-  total: { aggregate: { count: number } };
-  reviewed: { aggregate: { count: number; avg: { score: number | null } } };
-}
+// History item type
+export type ResumeHistoryItem = NonNullable<GetResumeHistoryQuery["resume_history"]>[number];
+export type GetResumeHistoryResponse = GetResumeHistoryQuery;
 
-export interface ResumeHistoryItem {
-  history_id: string;
-  resume_id: string;
-  clerk_user_id: string;
-  version: number;
-  ai_feedback: Record<string, unknown> | null;
-  score: number | null;
-  created_at: string;
-}
-
-export interface GetResumeHistoryResponse {
-  resume_history: ResumeHistoryItem[];
-}
-
-export interface CreateResumeResponse {
-  insert_resumes_one: Resume | null;
-}
+// Create response
+export type CreateResumeResponse = CreateResumeMutation;

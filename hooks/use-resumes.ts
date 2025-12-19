@@ -99,9 +99,9 @@ export function useResumeStats() {
       );
 
       return {
-        total: data.total.aggregate.count,
-        reviewed: data.reviewed.aggregate.count,
-        avgScore: Math.round(data.reviewed.aggregate.avg?.score || 0),
+        total: data.total.aggregate?.count ?? 0,
+        reviewed: data.reviewed.aggregate?.count ?? 0,
+        avgScore: Math.round(data.reviewed.aggregate?.avg?.score ?? 0),
       };
     },
     enabled: !!userId,

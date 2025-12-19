@@ -7,47 +7,10 @@ import {
   mockDbState,
 } from '../mocks/db';
 
-// Mock the core module before importing
-vi.mock('@/lib/db/core', () => ({
-  getDrizzleDB: vi.fn(() => mockDrizzleDb),
-}));
-
-// Create a chainable mock database
-const mockDrizzleDb = {
-  select: vi.fn(),
-  insert: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
-};
-
 describe('Questions Module', () => {
   beforeEach(() => {
     resetMockDbState();
     vi.clearAllMocks();
-
-    // Reset mock chain
-    mockDrizzleDb.select.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-          orderBy: vi.fn().mockResolvedValue([]),
-        }),
-        orderBy: vi.fn().mockResolvedValue([]),
-      }),
-    });
-    mockDrizzleDb.insert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
-    mockDrizzleDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue({ rowsAffected: 1 }),
-      }),
-    });
-    mockDrizzleDb.delete.mockReturnValue({
-      where: vi.fn().mockResolvedValue({ rowsAffected: 1 }),
-    });
   });
 
   afterEach(() => {

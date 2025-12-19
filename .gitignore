@@ -47,5 +47,7 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
+# GraphQL CodeGen
+lib/graphql/__generated__/
 
 .env*

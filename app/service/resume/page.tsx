@@ -44,7 +44,7 @@ function formatRelativeTime(dateString: string): string {
  * GraphQL에서 jsonb 타입은 객체로 반환되므로 두 가지 케이스를 처리
  */
 function parseAIFeedback(
-  aiFeedback: string | Record<string, unknown> | null
+  aiFeedback: string | Record<string, unknown> | null | undefined
 ): string {
   if (!aiFeedback) return "";
 
@@ -82,8 +82,8 @@ function parseAIFeedback(
 /**
  * 점수 기반으로 상태를 결정
  */
-function getStatusFromScore(score: number | null): "Reviewed" | "Draft" {
-  return score !== null ? "Reviewed" : "Draft";
+function getStatusFromScore(score: number | null | undefined): "Reviewed" | "Draft" {
+  return score != null ? "Reviewed" : "Draft";
 }
 
 /**

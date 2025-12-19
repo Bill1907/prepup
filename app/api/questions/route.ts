@@ -50,15 +50,15 @@ export async function GET(request: NextRequest) {
       );
 
       const stats = {
-        total: data.total.aggregate.count,
-        bookmarked: data.bookmarked.aggregate.count,
+        total: data.total.aggregate?.count ?? 0,
+        bookmarked: data.bookmarked.aggregate?.count ?? 0,
         byCategory: {
-          behavioral: data.behavioral.aggregate.count,
-          technical: data.technical.aggregate.count,
-          system_design: data.system_design.aggregate.count,
-          leadership: data.leadership.aggregate.count,
-          problem_solving: data.problem_solving.aggregate.count,
-          company_specific: data.company_specific.aggregate.count,
+          behavioral: data.behavioral.aggregate?.count ?? 0,
+          technical: data.technical.aggregate?.count ?? 0,
+          system_design: data.system_design.aggregate?.count ?? 0,
+          leadership: data.leadership.aggregate?.count ?? 0,
+          problem_solving: data.problem_solving.aggregate?.count ?? 0,
+          company_specific: data.company_specific.aggregate?.count ?? 0,
         },
       };
 

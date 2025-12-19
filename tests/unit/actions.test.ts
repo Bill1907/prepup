@@ -34,18 +34,6 @@ vi.mock('@/lib/openaiClient', () => ({
   },
 }));
 
-// Create chainable mock DB
-const mockDb = {
-  select: vi.fn(),
-  insert: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
-};
-
-vi.mock('@/lib/db', () => ({
-  getDrizzleDB: vi.fn(() => mockDb),
-}));
-
 import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 
@@ -53,23 +41,6 @@ describe('Server Actions', () => {
   beforeEach(() => {
     resetMockDbState();
     vi.clearAllMocks();
-
-    // Setup default mock chain
-    mockDb.select.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-    mockDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue({ rowsAffected: 1 }),
-      }),
-    });
-    mockDb.delete.mockReturnValue({
-      where: vi.fn().mockResolvedValue({ rowsAffected: 1 }),
-    });
   });
 
   afterEach(() => {

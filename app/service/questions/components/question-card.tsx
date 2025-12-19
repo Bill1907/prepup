@@ -11,10 +11,10 @@ import type { QuestionCategory } from "@/lib/graphql/queries/questions";
 interface Question {
   questionId: string;
   questionText: string;
-  category: QuestionCategory | null;
-  difficulty: "easy" | "medium" | "hard" | null;
-  suggestedAnswer: string | null;
-  tips: string | null;
+  category: QuestionCategory | null | undefined;
+  difficulty: "easy" | "medium" | "hard" | null | undefined;
+  suggestedAnswer: string | null | undefined;
+  tips: string | null | undefined;
   isBookmarked: boolean;
 }
 

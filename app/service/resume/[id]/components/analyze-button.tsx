@@ -17,7 +17,7 @@ interface ResumeAnalysisData {
 
 interface AnalyzeButtonProps {
   resumeId: string;
-  fileUrl: string | null;
+  fileUrl: string | null | undefined;
   isPdf: boolean;
   disabled?: boolean;
 }

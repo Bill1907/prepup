@@ -107,68 +107,6 @@ export function createMockQuestion(overrides: Partial<MockQuestion> = {}): MockQ
   };
 }
 
-// Create a fully functional mock database
-export function createMockDrizzleDb() {
-  const mockDb = {
-    select: vi.fn(() => ({
-      from: vi.fn((table: { name?: string } | string) => {
-        const tableName = typeof table === 'string' ? table :
-          (table as { name?: string }).name || 'unknown';
-
-        return {
-          where: vi.fn(() => ({
-            limit: vi.fn((num: number) => {
-              const data = getTableData(tableName);
-              return Promise.resolve(data.slice(0, num));
-            }),
-            orderBy: vi.fn(() => {
-              const data = getTableData(tableName);
-              return Promise.resolve(data);
-            }),
-          })),
-          orderBy: vi.fn(() => Promise.resolve(getTableData(tableName))),
-          limit: vi.fn((num: number) => Promise.resolve(getTableData(tableName).slice(0, num))),
-        };
-      }),
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => Promise.resolve()),
-        returning: vi.fn(() => Promise.resolve([])),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve({ rowsAffected: 1 })),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      where: vi.fn(() => Promise.resolve({ rowsAffected: 1 })),
-    })),
-  };
-
-  return mockDb;
-}
-
-function getTableData(tableName: string): unknown[] {
-  switch (tableName) {
-    case 'users':
-      return mockDbState.users;
-    case 'resumes':
-      return mockDbState.resumes;
-    case 'interview_questions':
-    case 'questions':
-      return mockDbState.questions;
-    case 'resume_history':
-      return mockDbState.resumeHistory;
-    default:
-      return [];
-  }
-}
-
-// Mock for getDrizzleDB
-export const mockGetDrizzleDB = vi.fn(() => createMockDrizzleDb());
-
 // Mock for getR2Bucket
 export const mockGetR2Bucket = vi.fn(() => ({
   get: vi.fn(),

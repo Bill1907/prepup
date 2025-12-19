@@ -67,7 +67,7 @@ interface AIFeedbackData {
  * 레거시 데이터의 경우 문자열로 반환될 수 있음
  */
 function parseAIFeedback(
-  aiFeedback: string | Record<string, unknown> | null
+  aiFeedback: string | Record<string, unknown> | null | undefined
 ): AIFeedbackData | null {
   if (!aiFeedback) return null;
 
@@ -408,13 +408,13 @@ export default function ResumeDetailPage() {
             <CardContent className="space-y-4">
               <div>
                 <Badge
-                  variant={resume.score !== null ? "default" : "outline"}
+                  variant={resume.score != null ? "default" : "outline"}
                   className="mb-2"
                 >
-                  {resume.score !== null ? "Reviewed" : "Draft"}
+                  {resume.score != null ? "Reviewed" : "Draft"}
                 </Badge>
               </div>
-              {resume.score !== null && (
+              {resume.score != null && (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">ATS Score</span>

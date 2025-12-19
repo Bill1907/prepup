@@ -204,7 +204,7 @@ export default async function ResumeHistoryPage({ params }: PageProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {resume.score !== null && (
+            {resume.score != null && (
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
